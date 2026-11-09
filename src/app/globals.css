@@ -161,3 +161,5 @@ a{color:var(--accent)}
 .who .moi{font-size:13px}
 form.ligne{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 form.ligne select,form.ligne input{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 6px}
+.tabs a{padding:8px 12px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
+.tabs a[aria-selected="true"]{color:var(--accent);border-color:var(--accent);font-weight:600}

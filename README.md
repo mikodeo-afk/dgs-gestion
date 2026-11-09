@@ -13,12 +13,16 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 - Tout le monde voit l'avancement global des chantiers ; le détail dépend du périmètre (chef de projet : ses chantiers ; chef d'équipe : son équipe ; technicien : ses tâches).
 - Personnel : création des comptes, responsable, contrat, salaire (visible seulement avec le droit « Voir les salaires »).
 - Journal d'activité.
+- Dépenses imputées à un chantier ou aux frais généraux, avec circuit de validation : jusqu'à 2 000 000 FCFA le RAF valide, au-delà le PDG ou le DO ; personne ne valide sa propre demande ; le comptable ou le RAF paie.
+- Factures clients (numéro automatique, TVA 18 %, encaissement, retards) et factures fournisseurs (bon à payer, paiement).
+- Rentabilité par projet : facturé − (dépenses + factures fournisseurs + main-d'œuvre de terrain).
+- Frais généraux mois par mois : saisies, dépenses et factures hors projet, salaires du personnel administratif.
 
-À venir : dépenses et circuit de validation, factures clients et fournisseurs, rentabilité par projet, frais généraux, présences, paie, puis l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation).
+À venir : présences, paie, contrats, puis l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation).
 
 ## Mise en service
 
-1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter le contenu de `supabase/migrations/0001_fondations.sql`.
+1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001_fondations.sql`, puis `0002_finances.sql`).
 2. **Vercel** : importer ce dépôt GitHub, puis renseigner les variables d'environnement (voir `.env.example`) :
    - `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API) ;
    - `SUPABASE_SERVICE_ROLE_KEY` (même page ; clé secrète, uniquement sur le serveur).

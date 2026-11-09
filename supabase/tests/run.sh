@@ -10,4 +10,6 @@ trap 'psql "$URL_BASE" -qc "drop database if exists $DB" >/dev/null' EXIT
 URL="${URL_BASE%/*}/$DB"
 psql "$URL" -q -v ON_ERROR_STOP=1 -f tests/stub_auth.sql >/dev/null
 for f in migrations/*.sql; do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null; done
-psql "$URL" -q -v ON_ERROR_STOP=1 -f tests/tests.sql 2>&1 | sed 's/^psql:[^ ]* NOTICE:  //' | grep -v '^\s*$'
+for t in tests/tests.sql tests/tests_finances.sql; do
+  psql "$URL" -q -v ON_ERROR_STOP=1 -f "$t" 2>&1 | sed 's/^psql:[^ ]* NOTICE:  //' | grep -v '^\s*$'
+done
