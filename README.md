@@ -18,11 +18,15 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 - Rentabilité par projet : facturé − (dépenses + factures fournisseurs + main-d'œuvre de terrain).
 - Frais généraux mois par mois : saisies, dépenses et factures hors projet, salaires du personnel administratif.
 
-À venir : présences, paie, contrats, puis l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation).
+- Présences : saisie par les RH (tout jour) ou par le chef d'équipe (son équipe, le jour même), tableau du mois.
+- Paie mensuelle : les RH préparent (primes, avances), le RAF, le PDG ou le DO valide, le comptable paie ; retenue d'absence et INPS calculées ; chacun voit son bulletin.
+- Contrats et congés : fins de contrat à moins de 60 jours, congés acquis (2,5 j/mois).
+
+À venir : l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation), l'impôt sur salaire (ITS) et les pièces jointes (photos de justificatifs).
 
 ## Mise en service
 
-1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001_fondations.sql`, puis `0002_finances.sql`).
+1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001_fondations.sql`, `0002_finances.sql`, puis `0003_rh.sql`).
 2. **Vercel** : importer ce dépôt GitHub, puis renseigner les variables d'environnement (voir `.env.example`) :
    - `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API) ;
    - `SUPABASE_SERVICE_ROLE_KEY` (même page ; clé secrète, uniquement sur le serveur).

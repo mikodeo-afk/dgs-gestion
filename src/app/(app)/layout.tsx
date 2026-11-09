@@ -15,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (s.peut("dep.demander") || s.peut("dep.valider") || s.peut("dep.valider_tout") || s.peut("dep.payer") || (s.global && s.peut("fin.voir")))
     liens.push({ href: "/depenses", libelle: "Dépenses" });
   if (s.peut("fin.voir")) liens.push({ href: "/finances", libelle: "Finances" });
+  liens.push({ href: "/rh", libelle: terrain ? "Mon espace RH" : "Ressources humaines" });
   liens.push({ href: "/personnel", libelle: terrain ? "Ma fiche" : "Personnel" });
   liens.push({ href: "/droits", libelle: s.peut("droits.gerer") ? "Rôles et droits" : "Mes droits" });
 
