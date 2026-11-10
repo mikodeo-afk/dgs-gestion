@@ -8,6 +8,9 @@ import { FormFactureClient, FormFactureFournisseur, FormFraisGeneral, type BcVal
 import { annulerFactureClient, annulerFactureFournisseur, deciderFactureFournisseur, emettreAvoir, encaisser, payerFactureFournisseur } from "./actions";
 import { Correction } from "@/components/Correction";
 import { tauxDuPays } from "@/lib/parametres";
+import Justificatifs from "@/components/Justificatifs";
+import { documentsPar } from "@/lib/justificatifs";
+
 
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const libMois = (m: string) => `${MOIS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
@@ -18,7 +21,7 @@ const decaler = (m: string, k: number) => {
 
 type Rent = { chantier_id: string; code: string; nom: string; montant_marche: number; budget_depenses: number; facture_ht: number; encaisse_ht: number; depenses: number; factures_fournisseurs: number; main_oeuvre: number; couts: number; marge: number };
 
-export default async function Finances({ searchParams }: { searchParams: Promise<{ onglet?: string; mois?: string }> }) {
+export default async function Finances({ searchParams }: { searchParams: Promise<{ onglet?: string; mois?: string; erreur?: string }> }) {
   const s = await exigerSession();
   if (!s.peut("fin.voir")) redirect("/");
   const sp = await searchParams;
@@ -183,6 +186,12 @@ export default async function Finances({ searchParams }: { searchParams: Promise
     ]);
     const S = Number(seuil ?? 2000000);
     const liste = data ?? [];
+    const [{ data: fous }, { data: fisc }] = await Promise.all([
+      supabase.from("tiers").select("id,nom,type").in("type", ["fournisseur", "prestataire"]).eq("actif", true).order("nom"),
+      supabase.from("justificatifs").select("objet_id,valide_jusquau").eq("objet", "tiers").in("type_document", ["Attestation de régularité fiscale", "Quitus fiscal"]).gte("valide_jusquau", auj),
+    ]);
+    const fiscalOk = new Set((fisc ?? []).map((x) => x.objet_id));
+    const docsFf = await documentsPar("facture_fournisseur");
     const { data: bcs } = await supabase.from("bons_commande").select("id,numero,chantier_id,fournisseur,objet").eq("statut", "Validé").order("numero");
     const bonsValides: BcValide[] = (bcs ?? []).map((b) => ({ ...b, code: codes.get(b.chantier_id) ?? "" }));
     const nonRejetees = liste.filter((f) => f.statut !== "Rejetée" && f.statut !== "Annulée");
@@ -191,7 +200,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
     const peutValider = (m: number) => s.peut("dep.valider_tout") || (s.peut("dep.valider") && m <= S);
     contenu = (
       <>
-        {s.peut("ff.enregistrer") && <FormFactureFournisseur chantiers={chantiers ?? []} pvs={await pvSignes("prestataire")} bons={bonsValides} tva={taux.tva} aib={aibs} />}
+        {s.peut("ff.enregistrer") && <FormFactureFournisseur chantiers={chantiers ?? []} pvs={await pvSignes("prestataire")} bons={bonsValides} tva={taux.tva} aib={aibs} fournisseurs={fous ?? []} />}
         <div className="kpis">
           <Kpi libelle="Total HT" valeur={fcfa(somme(nonRejetees, "montant_ht"))} unite="FCFA" />
           <Kpi libelle="TVA déductible" valeur={fcfa(somme(nonRejetees, "montant_tva"))} unite="FCFA" />
@@ -199,17 +208,19 @@ export default async function Finances({ searchParams }: { searchParams: Promise
           <Kpi libelle="Reste à payer (net d'AIB)" valeur={fcfa(aPayer)} unite="FCFA" ton={aPayer ? "hl" : undefined} />
         </div>
         <section className="panel">
-          <p className="note">Circuit : la facture est enregistrée, puis reçoit un bon à payer (RAF jusqu&apos;à {fcfa(S)} FCFA, PDG ou DO au-delà), puis elle est payée. Personne ne valide une facture qu&apos;il a saisie. L&apos;AIB est retenu par DGS : le net à payer est le TTC moins l&apos;AIB. Une facture erronée non payée s&apos;annule avec un motif, puis se ressaisit.</p>
+          <p className="note">Circuit : la facture est enregistrée, puis reçoit un bon à payer (RAF jusqu&apos;à {fcfa(S)} FCFA, PDG ou DO au-delà), puis elle est payée. Personne ne valide une facture qu&apos;il a saisie. L&apos;AIB est retenu par DGS : le net à payer est le TTC moins l&apos;AIB. Une facture erronée non payée s&apos;annule avec un motif, puis se ressaisit. Le bon à payer et le paiement exigent une attestation fiscale du fournisseur en cours de validité (sur sa fiche).</p>
           <div className="tbl">
             <table>
-              <thead><tr><th>Fournisseur</th><th>Objet</th><th>Imputation</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th className="num">AIB</th><th className="num">Net à payer</th><th>Statut</th><th>Action</th></tr></thead>
+              <thead><tr><th>Fournisseur</th><th>Objet</th><th>Imputation</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th className="num">AIB</th><th className="num">Net à payer</th><th>Statut</th><th>Facture</th><th>Action</th></tr></thead>
               <tbody>
                 {liste.map((f) => {
                   const m = Number(f.montant_ht);
                   const decide = f.statut === "Reçue" && f.saisie_par !== s.profil.id && peutValider(m);
                   return (
                     <tr key={f.id} className={f.statut === "Annulée" ? "annule" : undefined}>
-                      <td>{f.fournisseur}<br /><span className="code">{f.numero}</span>{f.statut === "Annulée" && <><br /><span className="note">Annulée le {dateFr(f.annulee_le)} : {f.motif_annulation}</span></>}</td>
+                      <td>{f.tiers_id ? <Link href={`/tiers/${f.tiers_id}`}>{f.fournisseur}</Link> : f.fournisseur}<br /><span className="code">{f.numero}</span>
+                        {(f.statut === "Reçue" || f.statut === "Validée") && (!f.tiers_id ? <><br /><span className="neg">Fournisseur non enregistré</span></>
+                          : !fiscalOk.has(f.tiers_id) ? <><br /><span className="neg">Attestation fiscale manquante ou expirée</span></> : null)}{f.statut === "Annulée" && <><br /><span className="note">Annulée le {dateFr(f.annulee_le)} : {f.motif_annulation}</span></>}</td>
                       <td>{f.objet}{(f.pv?.numero || f.bc?.numero) && <><br /><span className="note">{[f.pv?.numero && `PV ${f.pv.numero}`, f.bc?.numero && `BC ${f.bc.numero}`].filter(Boolean).join(" · ")}</span></>}</td>
                       <td>{f.chantier_id ? <span className="code">{codes.get(f.chantier_id)}</span> : <span className="dom">Frais généraux</span>}</td>
                       <td className="num">{dateFr(f.echeance)}{f.statut !== "Payée" && f.echeance && f.echeance < auj && <><br /><Pastille texte="Échue" ton="bad" /></>}</td>
@@ -219,6 +230,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                       <td className="num">{Number(f.taux_aib) ? <>{fcfa(f.montant_aib)}<br /><span className="note">{Number(f.taux_aib)} %</span></> : "—"}</td>
                       <td className="num"><b>{fcfa(f.net_a_payer)}</b></td>
                       <td><Pastille texte={f.statut === "Validée" ? "Bon à payer" : f.statut} ton={f.statut === "Payée" || f.statut === "Validée" ? "ok" : f.statut === "Rejetée" || f.statut === "Annulée" ? "bad" : "warn"} /></td>
+                      <td><Justificatifs compact objet="facture_fournisseur" objetId={f.id} numero={f.numero} pays={s.pays.code} fichiers={docsFf(f.id)} peutDeposer={s.peut("ff.enregistrer") && f.statut !== "Annulée"} page="/finances" /></td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         {decide && (
                           <span className="statusline">
@@ -236,7 +248,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                     </tr>
                   );
                 })}
-                {!liste.length && <tr><td colSpan={11} className="note">Aucune facture fournisseur.</td></tr>}
+                {!liste.length && <tr><td colSpan={12} className="note">Aucune facture fournisseur.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -289,6 +301,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
           <Link key={k} href={`/finances?onglet=${k}`} role="tab" aria-selected={k === onglet} className="tab">{l}</Link>
         ))}
       </div>
+      {sp.erreur && <p className="erreur">{sp.erreur}</p>}
       {contenu}
     </>
   );

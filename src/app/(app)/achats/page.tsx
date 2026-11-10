@@ -2,6 +2,8 @@ import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { dateFr, fcfa } from "@/lib/format";
 import { Kpi, Pastille } from "@/components/ui";
+import Justificatifs from "@/components/Justificatifs";
+import { documentsPar } from "@/lib/justificatifs";
 import { DecisionBon, EtudeDemande, FormDemandeAchat } from "./Formulaires";
 
 const TON: Record<string, "ok" | "warn" | "bad"> = { Soumise: "warn", Commandée: "ok", Rejetée: "bad", "À valider": "warn", Validé: "ok", Rejeté: "bad" };
@@ -17,6 +19,8 @@ export default async function Achats() {
     supabase.rpc("mes_chantiers"),
   ]);
   const noms = new Map((profils ?? []).map((p) => [p.id, p.nom]));
+  const docsBc = await documentsPar("bon_commande");
+  const deposeBc = s.peut("bc.initier") || s.peut("bc.valider");
   const codes = new Map((chantiers ?? []).map((c) => [c.id, c.code]));
   const perim = new Set(((mes ?? []) as unknown as string[]).map((x) => (typeof x === "string" ? x : Object.values(x)[0] as string)));
   const projets = (chantiers ?? []).filter((c) => s.global || perim.has(c.id));
@@ -67,7 +71,7 @@ export default async function Achats() {
         <h2>Bons de commande</h2>
         <div className="tbl">
           <table>
-            <thead><tr><th>Bon</th><th>Projet</th><th>Fournisseur</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Initié par</th><th>Statut</th><th>Action</th></tr></thead>
+            <thead><tr><th>Bon</th><th>Projet</th><th>Fournisseur</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Initié par</th><th>Statut</th><th>Bon signé</th><th>Action</th></tr></thead>
             <tbody>
               {bc.map((b) => (
                 <tr key={b.id}>
@@ -79,10 +83,11 @@ export default async function Achats() {
                   <td className="num"><b>{fcfa(b.montant_ttc)}</b></td>
                   <td>{noms.get(b.initie_par)}</td>
                   <td><Pastille texte={b.statut === "À valider" ? "À valider (DO)" : b.statut} ton={TON[b.statut]} />{b.valide_par && <><br /><span className="note">par {noms.get(b.valide_par)}</span></>}{b.motif_rejet && <><br /><span className="note">{b.motif_rejet}</span></>}</td>
+                  <td>{(b.statut === "Validé" || docsBc(b.id).length > 0) && <Justificatifs compact objet="bon_commande" objetId={b.id} numero={b.numero} pays={s.pays.code} fichiers={docsBc(b.id)} peutDeposer={deposeBc && b.statut === "Validé"} page="/achats" />}</td>
                   <td>{b.statut === "À valider" && s.peut("bc.valider") && b.initie_par !== s.profil.id && <DecisionBon id={b.id} numero={b.numero} />}</td>
                 </tr>
               ))}
-              {!bc.length && <tr><td colSpan={9} className="note">Aucun bon de commande.</td></tr>}
+              {!bc.length && <tr><td colSpan={10} className="note">Aucun bon de commande.</td></tr>}
             </tbody>
           </table>
         </div>

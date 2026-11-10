@@ -198,3 +198,10 @@ tr.annule .code{text-decoration:line-through}
 /* Couleurs du logo DGS : bleu nuit et or */
 .top{border-bottom:3px solid var(--gold)}
 .who .btn.pri,.top .btn.pri{background:var(--gold);border-color:var(--gold);color:#01014c}
+/* Justificatifs (documents signés) */
+.justif{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.justif .depot{cursor:pointer;border-style:dashed}
+.justif.compact{flex-direction:column;align-items:flex-start}
+/* Quantitatifs */
+.qte input{width:110px;text-align:right}
+td.depasse{color:var(--bad);font-weight:600}

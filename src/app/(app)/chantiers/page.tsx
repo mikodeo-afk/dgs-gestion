@@ -9,12 +9,13 @@ import FormChantier from "./FormChantier";
 export default async function Chantiers() {
   const s = await exigerSession();
   const supabase = await supabaseServeur();
-  const [{ data: chantiers }, { data: av }, { data: fin }, { data: profils }, { data: taches }] = await Promise.all([
+  const [{ data: chantiers }, { data: av }, { data: fin }, { data: profils }, { data: taches }, { data: clients }] = await Promise.all([
     supabase.from("chantiers").select("*").order("code"),
     supabase.rpc("avancement_chantiers"),
     supabase.from("chantiers_finance").select("*"),
     supabase.from("profils").select("id,nom,poste").eq("actif", true),
     supabase.from("taches").select("chantier_id"),
+    supabase.from("tiers").select("id,nom").eq("type", "client").eq("actif", true).order("nom"),
   ]);
   const avm = new Map(((av ?? []) as { chantier_id: string; avancement: number }[]).map((a) => [a.chantier_id, Number(a.avancement)]));
   const finm = new Map((fin ?? []).map((x) => [x.chantier_id, x]));
@@ -32,7 +33,7 @@ export default async function Chantiers() {
         </div>
       </div>
       {s.peut("chantier.creer") ? (
-        <FormChantier chefs={(profils ?? []).filter((p) => p.poste === "cp")} />
+        <FormChantier chefs={(profils ?? []).filter((p) => p.poste === "cp")} clients={clients ?? []} />
       ) : (
         <Verrou titre="Création de chantier non autorisée">Votre profil ne permet pas d&apos;ouvrir un nouveau chantier.</Verrou>
       )}
@@ -58,7 +59,7 @@ export default async function Chantiers() {
                     <td style={{ minWidth: 150 }}><Barre valeur={avm.get(c.id) ?? 0} /></td>
                     {voitFin && <td className="num">{f ? fcfa(f.montant_marche) : "—"}</td>}
                     {voitFin && <td className="num">{f ? fcfa(f.budget_depenses) : "—"}</td>}
-                    <td><Pastille texte={c.statut} /></td>
+                    <td><Pastille texte={c.validation === "À valider" ? "À valider" : c.statut} ton={c.validation === "À valider" ? "warn" : undefined} /></td>
                   </tr>
                 );
               })}

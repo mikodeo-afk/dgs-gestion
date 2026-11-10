@@ -47,11 +47,17 @@ export function FormFactureClient({ pvs, tva, aib }: { pvs: PvSigne[]; tva: numb
   );
 }
 
-export function FormFactureFournisseur({ chantiers, pvs, bons, tva, aib }: { chantiers: Ch[]; pvs: PvSigne[]; bons: BcValide[]; tva: number; aib: number[] }) {
+export function FormFactureFournisseur({ chantiers, pvs, bons, tva, aib, fournisseurs }: { chantiers: Ch[]; pvs: PvSigne[]; bons: BcValide[]; tva: number; aib: number[]; fournisseurs: { id: string; nom: string; type: string }[] }) {
   const [etat, action, enCours] = useActionState(enregistrerFactureFournisseur, null);
   return (
     <form className="inline" action={action}>
-      <label>Fournisseur<input id="ff-fou" name="fournisseur" required /></label>
+      <label>Fournisseur ou prestataire
+        <select id="ff-fou" name="tiers_id" required defaultValue="">
+          <option value="" disabled>Choisir…</option>
+          <optgroup label="Fournisseurs">{fournisseurs.filter((x) => x.type === "fournisseur").map((x) => <option key={x.id} value={x.id}>{x.nom}</option>)}</optgroup>
+          <optgroup label="Prestataires">{fournisseurs.filter((x) => x.type === "prestataire").map((x) => <option key={x.id} value={x.id}>{x.nom}</option>)}</optgroup>
+        </select>
+      </label>
       <label>N° de facture<input id="ff-num" name="numero" required /></label>
       <label>Objet<input id="ff-objet" name="objet" required /></label>
       <label>Imputation
@@ -66,7 +72,7 @@ export function FormFactureFournisseur({ chantiers, pvs, bons, tva, aib }: { cha
       <label>Bon de commande (facultatif)
         <select id="ff-bc" name="bon_commande_id" defaultValue=""><option value="">Aucun</option>{bons.map((b) => <option key={b.id} value={b.id}>{b.numero} · {b.code} · {b.fournisseur}</option>)}</select>
       </label>
-      <label>Montant HT (FCFA)<input id="ff-ht" name="montant_ht" type="number" min="1" required /></label>
+      <label>Montant HT (FCFA)<input id="ff-ht" name="montant_ht" type="number" min="1" placeholder="repris du PV s'il y en a un" /></label>
       <ChoixTaxes tva={tva} aib={aib} pre="ff" />
       <label>Échéance<input id="ff-ech" name="echeance" type="date" /></label>
       <button className="btn pri" type="submit" disabled={enCours}>Enregistrer la facture</button>

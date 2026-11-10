@@ -1,4 +1,7 @@
 import { redirect } from "next/navigation";
+import Justificatifs from "@/components/Justificatifs";
+import { documentsPar } from "@/lib/justificatifs";
+
 import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { dateFr, fcfa } from "@/lib/format";
@@ -18,6 +21,7 @@ export default async function Soumissions() {
     supabase.from("profils").select("id,nom"),
   ]);
   const noms = new Map((profils ?? []).map((p) => [p.id, p.nom]));
+  const docsPf = await documentsPar("proforma");
   const liste = data ?? [];
   const monVisa = (f: (typeof liste)[number]) =>
     f.statut === "À viser" && s.peut("pf.valider") &&
@@ -44,7 +48,7 @@ export default async function Soumissions() {
       <section className="panel">
         <div className="tbl">
           <table>
-            <thead><tr><th>Proforma</th><th>Client</th><th className="num">Dépôt</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Visa DG</th><th>Visa DO</th><th>Statut</th><th>Action</th></tr></thead>
+            <thead><tr><th>Proforma</th><th>Client</th><th className="num">Dépôt</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Visa DG</th><th>Visa DO</th><th>Statut</th><th>Document signé</th><th>Action</th></tr></thead>
             <tbody>
               {liste.map((f) => (
                 <tr key={f.id}>
@@ -57,6 +61,7 @@ export default async function Soumissions() {
                   <td>{f.visa_dg_par ? <Pastille texte={`Visé ${dateFr(f.visa_dg_le.slice(0, 10))}`} ton="ok" /> : <span className="note">en attente</span>}</td>
                   <td>{f.visa_do_par ? <Pastille texte={`Visé ${dateFr(f.visa_do_le.slice(0, 10))}`} ton="ok" /> : <span className="note">en attente</span>}</td>
                   <td><Pastille texte={f.statut} ton={TON[f.statut]} />{f.motif_rejet && <><br /><span className="note">{f.motif_rejet}</span></>}</td>
+                  <td>{f.statut !== "À viser" && f.statut !== "Rejetée" && <Justificatifs compact objet="proforma" objetId={f.id} numero={f.numero} pays={s.pays.code} fichiers={docsPf(f.id)} peutDeposer={s.peut("pf.initier") || s.peut("pf.valider")} page="/soumissions" />}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     {monVisa(f) && <VisaProforma id={f.id} numero={f.numero} />}
                     {f.statut === "Validée" && suit && (
@@ -68,7 +73,7 @@ export default async function Soumissions() {
                   </td>
                 </tr>
               ))}
-              {!liste.length && <tr><td colSpan={10} className="note">Aucune proforma.</td></tr>}
+              {!liste.length && <tr><td colSpan={11} className="note">Aucune proforma.</td></tr>}
             </tbody>
           </table>
         </div>

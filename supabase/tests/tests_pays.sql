@@ -45,6 +45,7 @@ commit;
 -- Numérotation propre à chaque pays.
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000041';
 insert into pv_execution (chantier_id,type,tiers,objet,montant_ht) values ('10000000-0000-0000-0000-000000000040','client','Opérateur BJ','Acompte',10000000);
+insert into justificatifs (objet,objet_id,chemin,nom_fichier) select 'pv', id, pays||'/pv/'||id||'/signe.pdf', 'signe.pdf' from pv_execution where id = (select id from pv_execution);
 select signer_pv((select id from pv_execution));
 select pg_temp.check((select numero from pv_execution) like 'PV-%-001', 'les PV du Bénin ont leur propre numérotation');
 commit;
