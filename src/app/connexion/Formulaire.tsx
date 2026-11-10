@@ -1,17 +1,25 @@
 "use client";
 import { useActionState } from "react";
+import type { Pays } from "@/lib/types";
 import { seConnecter } from "./actions";
 
-export default function Formulaire({ inactif }: { inactif: boolean }) {
+export default function Formulaire({ inactif, pays }: { inactif: boolean; pays: Pays[] }) {
   const [etat, action, enCours] = useActionState(seConnecter, null);
   return (
     <form action={action}>
       <div>
-        <h1>DGS Bamako</h1>
-        <p className="sub">Gestion des activités. Connectez-vous avec le compte créé par les RH.</p>
+        <h1>DGS Gestion</h1>
+        <p className="sub">Choisissez votre pays, puis connectez-vous avec le compte créé par les RH de ce pays.</p>
       </div>
       {inactif && <p className="erreur">Votre compte n&apos;est pas encore activé. Contactez le service RH.</p>}
       {etat?.erreur && <p className="erreur">{etat.erreur}</p>}
+      <label>
+        Pays
+        <select id="pays" name="pays" required defaultValue="">
+          <option value="" disabled>Choisir…</option>
+          {pays.map((p) => <option key={p.code} value={p.code}>{p.nom}{p.ville ? ` (${p.ville})` : ""}</option>)}
+        </select>
+      </label>
       <label>
         E-mail
         <input id="email" name="email" type="email" required autoComplete="email" />
