@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { exigerDroit } from "@/lib/session";
+import { exigerDroit, exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/journal";
 
@@ -29,4 +29,15 @@ export async function signerPv(f: FormData) {
   await journaliser(`a enregistré la signature du PV ${txt(f, "numero")}`);
   revalidatePath("/pv");
   revalidatePath("/finances");
+}
+
+export async function annulerPv(_: Etat, f: FormData): Promise<Etat> {
+  await exigerSession();
+  const supabase = await supabaseServeur();
+  const { error } = await supabase.rpc("annuler_pv", { p_id: txt(f, "id"), p_motif: txt(f, "motif") });
+  if (error) return { erreur: error.message };
+  await journaliser(`a annulé le PV ${txt(f, "numero")} (motif : ${txt(f, "motif")})`);
+  revalidatePath("/pv");
+  revalidatePath("/finances");
+  return { ok: `PV ${txt(f, "numero")} annulé.` };
 }

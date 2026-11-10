@@ -4,6 +4,7 @@ import { exigerDroit, exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/journal";
 import { fcfa } from "@/lib/format";
+import { tauxDuPays } from "@/lib/parametres";
 
 type Etat = { ok?: string; erreur?: string } | null;
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -14,7 +15,7 @@ export async function initierProforma(_: Etat, f: FormData): Promise<Etat> {
   const ht = Number(txt(f, "montant_ht"));
   const { data, error } = await supabase.from("proformas").insert({
     client: txt(f, "client"), objet: txt(f, "objet"), domaine: txt(f, "domaine"), details: txt(f, "details") || null,
-    montant_ht: ht, taux_tva: txt(f, "taux_tva") === "0" ? 0 : 18, date_limite: txt(f, "date_limite") || null,
+    montant_ht: ht, taux_tva: txt(f, "taux_tva") === "0" ? 0 : (await tauxDuPays()).tva, date_limite: txt(f, "date_limite") || null,
   }).select("numero").single();
   if (error) return { erreur: "La proforma n'a pas été enregistrée : " + error.message };
   await journaliser(`a initié la proforma ${data.numero} pour ${txt(f, "client")} (${fcfa(ht)} FCFA HT)`);

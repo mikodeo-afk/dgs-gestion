@@ -34,7 +34,7 @@ export function EtudeDemande({ id, numero }: { id: string; numero: string }) {
         <input type="hidden" name="demande_id" value={id} /><input type="hidden" name="numero" value={numero} />
         <label>Fournisseur<input name="fournisseur" required /></label>
         <label>Montant HT (FCFA)<input name="montant_ht" type="number" min="1" required /></label>
-        <label>TVA<select name="taux_tva" defaultValue="18"><option value="18">18 %</option><option value="0">Exonérée (0 %)</option></select></label>
+        <label>TVA<select name="taux_tva" defaultValue="18"><option value="18">Taux du pays</option><option value="0">Exonérée (0 %)</option></select></label>
         <label>Livraison prévue<input name="livraison_le" type="date" /></label>
         <button className="btn sm pri" type="submit" disabled={enCoursBc}>Initier le bon de commande</button>
         <Retour etat={etatBc} />

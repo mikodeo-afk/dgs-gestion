@@ -4,6 +4,10 @@ import { exigerDroit, exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/journal";
 import { fcfa } from "@/lib/format";
+import { tauxDuPays } from "@/lib/parametres";
+
+type Etat = { ok?: string; erreur?: string } | null;
+const taux = (v: string, max = 100) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= max ? n : 0; };
 
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const fin = () => revalidatePath("/finances");
@@ -13,6 +17,7 @@ export async function emettreFacture(_: unknown, f: FormData) {
   const supabase = await supabaseServeur();
   const { data, error } = await supabase.from("factures_clients").insert({
     pv_id: txt(f, "pv_id"), objet: txt(f, "objet"), echeance: txt(f, "echeance"),
+    taux_tva: txt(f, "taux_tva") === "0" ? 0 : undefined, taux_aib: taux(txt(f, "taux_aib")),
   }).select("numero,montant_ht,montant_ttc").single();
   if (error) return { erreur: "La facture n'a pas été émise : " + error.message };
   await journaliser(`a émis la facture ${data.numero} (${fcfa(data.montant_ht)} FCFA HT, ${fcfa(data.montant_ttc)} FCFA TTC)`);
@@ -24,12 +29,13 @@ export async function enregistrerFactureFournisseur(_: unknown, f: FormData) {
   await exigerDroit("ff.enregistrer");
   const supabase = await supabaseServeur();
   const ch = txt(f, "chantier_id");
+  const { tva } = await tauxDuPays();
   const { error } = await supabase.from("factures_fournisseurs").insert({
     fournisseur: txt(f, "fournisseur"), numero: txt(f, "numero"), chantier_id: ch === "FG" ? null : ch,
     pv_id: txt(f, "pv_id") || null, bon_commande_id: txt(f, "bon_commande_id") || null,
-    objet: txt(f, "objet"), montant_ht: Number(txt(f, "montant_ht")), taux_tva: txt(f, "taux_tva") === "0" ? 0 : 18, echeance: txt(f, "echeance") || null,
+    objet: txt(f, "objet"), montant_ht: Number(txt(f, "montant_ht")), taux_tva: txt(f, "taux_tva") === "0" ? 0 : tva, taux_aib: taux(txt(f, "taux_aib")), echeance: txt(f, "echeance") || null,
   });
-  if (error) return { erreur: error.code === "23505" ? "Cette facture de ce fournisseur est déjà enregistrée." : "La facture n'a pas été enregistrée : " + error.message };
+  if (error) return { erreur: error.code === "23505" ? "Cette facture de ce fournisseur est déjà enregistrée (ou son PV est déjà facturé)." : "La facture n'a pas été enregistrée : " + error.message };
   await journaliser(`a enregistré la facture ${txt(f, "numero")} de ${txt(f, "fournisseur")}`);
   fin();
   return { ok: "Facture fournisseur enregistrée." };
@@ -64,4 +70,34 @@ export async function deciderFactureFournisseur(f: FormData) {
 }
 export async function payerFactureFournisseur(f: FormData) {
   await rpc("payer_facture_fournisseur", { p_id: txt(f, "id") }, `a payé la facture fournisseur ${txt(f, "numero")}`);
+}
+
+async function correction(nom: string, args: Record<string, unknown>, message: string, ok: string): Promise<Etat> {
+  await exigerDroit("doc.annuler");
+  const supabase = await supabaseServeur();
+  const { error } = await supabase.rpc(nom, args);
+  if (error) return { erreur: error.message };
+  await journaliser(message);
+  fin();
+  revalidatePath("/pv");
+  return { ok };
+}
+export async function annulerFactureClient(_: Etat, f: FormData): Promise<Etat> {
+  return correction("annuler_facture_client", { p_id: txt(f, "id"), p_motif: txt(f, "motif") },
+    `a annulé la facture ${txt(f, "numero")} (motif : ${txt(f, "motif")})`, `Facture ${txt(f, "numero")} annulée. Son PV peut être refacturé.`);
+}
+export async function annulerFactureFournisseur(_: Etat, f: FormData): Promise<Etat> {
+  return correction("annuler_facture_fournisseur", { p_id: txt(f, "id"), p_motif: txt(f, "motif") },
+    `a annulé la facture fournisseur ${txt(f, "numero")} (motif : ${txt(f, "motif")})`, `Facture ${txt(f, "numero")} annulée. Vous pouvez la ressaisir.`);
+}
+export async function emettreAvoir(_: Etat, f: FormData): Promise<Etat> {
+  await exigerDroit("doc.annuler");
+  const supabase = await supabaseServeur();
+  const ht = Number(txt(f, "montant_ht"));
+  const { data, error } = await supabase.from("avoirs_clients")
+    .insert({ facture_id: txt(f, "id"), montant_ht: ht, motif: txt(f, "motif") }).select("numero").single();
+  if (error) return { erreur: "L'avoir n'a pas été émis : " + error.message };
+  await journaliser(`a émis l'avoir ${data.numero} sur la facture ${txt(f, "numero")} (${fcfa(ht)} FCFA HT, motif : ${txt(f, "motif")})`);
+  fin();
+  return { ok: `Avoir ${data.numero} émis.` };
 }

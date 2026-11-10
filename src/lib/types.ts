@@ -35,6 +35,10 @@ export type Profil = {
 };
 
 export type Pays = { code: string; nom: string; ville: string | null; devise: string };
+export type Identite = Pays & {
+  raison_sociale: string | null; rccm: string | null; ifu: string | null;
+  adresse: string | null; telephone: string | null; email: string | null;
+};
 
 export type Chantier = {
   id: string;

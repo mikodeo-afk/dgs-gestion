@@ -5,7 +5,9 @@ import { supabaseServeur } from "@/lib/supabase/server";
 import { aujourdhui, dateFr, fcfa } from "@/lib/format";
 import { Kpi, Pastille } from "@/components/ui";
 import { FormFactureClient, FormFactureFournisseur, FormFraisGeneral, type BcValide, type PvSigne } from "./Formulaires";
-import { deciderFactureFournisseur, encaisser, payerFactureFournisseur } from "./actions";
+import { annulerFactureClient, annulerFactureFournisseur, deciderFactureFournisseur, emettreAvoir, encaisser, payerFactureFournisseur } from "./actions";
+import { Correction } from "@/components/Correction";
+import { tauxDuPays } from "@/lib/parametres";
 
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const libMois = (m: string) => `${MOIS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
@@ -26,6 +28,9 @@ export default async function Finances({ searchParams }: { searchParams: Promise
   const auj = aujourdhui();
   const mois = /^\d{4}-\d{2}$/.test(sp.mois ?? "") ? sp.mois! : auj.slice(0, 7);
   const supabase = await supabaseServeur();
+  const taux = await tauxDuPays();
+  const aibs = [taux.aib, 0, 1, 3, 5];
+  const corrige = s.peut("doc.annuler");
   const { data: chantiers } = await supabase.from("chantiers").select("id,code,nom").order("code");
   const codes = new Map((chantiers ?? []).map((c) => [c.id, c.code]));
   const pvSignes = async (type: "client" | "prestataire"): Promise<PvSigne[]> => {
@@ -85,49 +90,88 @@ export default async function Finances({ searchParams }: { searchParams: Promise
   }
 
   if (onglet === "clients") {
-    const { data } = await supabase.from("factures_clients").select("*, pv:pv_execution(numero)").order("date_emission", { ascending: false });
+    const [{ data }, { data: avs }] = await Promise.all([
+      supabase.from("factures_clients").select("*, pv:pv_execution(numero)").order("date_emission", { ascending: false }),
+      supabase.from("avoirs_clients").select("*").order("cree_le", { ascending: false }),
+    ]);
     const liste = data ?? [];
+    const avoirs = avs ?? [];
+    const numFac = new Map(liste.map((f) => [f.id, f.numero]));
+    const avoirsDe = (id: string) => avoirs.filter((a) => a.facture_id === id).reduce((t, a) => t + Number(a.montant_ht), 0);
+    const totAv = (c: "montant_ht" | "montant_tva" | "montant_ttc") => avoirs.reduce((t, a) => t + Number(a[c]), 0);
     const actives = liste.filter((f) => f.statut !== "Annulée");
     const somme = (l: typeof liste, c: "montant_ht" | "montant_tva" | "montant_ttc") => l.reduce((a, f) => a + Number(f[c]), 0);
-    const du = somme(liste.filter((f) => f.statut === "Émise"), "montant_ttc");
+    const du = liste.filter((f) => f.statut === "Émise").reduce((a, f) => a + Number(f.net_a_payer)
+      - avoirs.filter((x) => x.facture_id === f.id).reduce((t, x) => t + Number(x.net_a_payer), 0), 0);
     contenu = (
       <>
-        {s.peut("fc.emettre") && <FormFactureClient pvs={await pvSignes("client")} />}
+        {s.peut("fc.emettre") && <FormFactureClient pvs={await pvSignes("client")} tva={taux.tva} aib={aibs} />}
         <div className="kpis">
-          <Kpi libelle="Facturé HT" valeur={fcfa(somme(actives, "montant_ht"))} unite="FCFA" />
-          <Kpi libelle="TVA facturée" valeur={fcfa(somme(actives, "montant_tva"))} unite="FCFA" />
-          <Kpi libelle="Facturé TTC" valeur={fcfa(somme(actives, "montant_ttc"))} unite="FCFA" />
-          <Kpi libelle="Reste à encaisser TTC" valeur={fcfa(du)} unite="FCFA" ton={du ? "hl" : undefined} />
+          <Kpi libelle="Facturé HT (avoirs déduits)" valeur={fcfa(somme(actives, "montant_ht") - totAv("montant_ht"))} unite="FCFA" />
+          <Kpi libelle="TVA facturée" valeur={fcfa(somme(actives, "montant_tva") - totAv("montant_tva"))} unite="FCFA" />
+          <Kpi libelle="Facturé TTC" valeur={fcfa(somme(actives, "montant_ttc") - totAv("montant_ttc"))} unite="FCFA" />
+          <Kpi libelle="Reste à encaisser (net d'AIB)" valeur={fcfa(du)} unite="FCFA" ton={du ? "hl" : undefined} />
         </div>
         <section className="panel">
-          <p className="note">Numéro attribué automatiquement. Une facture non payée après son échéance apparaît « En retard ».</p>
+          <p className="note">Numéro attribué automatiquement. Une facture non payée après son échéance apparaît « En retard ». L&apos;AIB est retenu par le client : le net à encaisser est le TTC moins l&apos;AIB. Pour corriger : une facture non encaissée s&apos;annule avec un motif (son PV peut être refacturé) ; une facture encaissée ou déjà remise se corrige par un avoir.</p>
           <div className="tbl">
             <table>
-              <thead><tr><th>Facture</th><th>Projet</th><th className="num">Émise le</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Statut</th><th>Action</th></tr></thead>
+              <thead><tr><th>Facture</th><th>Projet</th><th className="num">Émise le</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th className="num">AIB</th><th className="num">Net à encaisser</th><th>Statut</th><th>Action</th></tr></thead>
               <tbody>
                 {liste.map((f) => {
                   const retard = f.statut === "Émise" && f.echeance < auj;
+                  const av = avoirsDe(f.id);
                   return (
-                    <tr key={f.id}>
-                      <td><span className="code">{f.numero}</span><br />{f.objet}{f.pv?.numero && <><br /><span className="note">PV {f.pv.numero}</span></>}</td>
+                    <tr key={f.id} className={f.statut === "Annulée" ? "annule" : undefined}>
+                      <td><span className="code">{f.numero}</span><br />{f.objet}{f.pv?.numero && <><br /><span className="note">PV {f.pv.numero}</span></>}
+                        {f.statut === "Annulée" && <><br /><span className="note">Annulée le {dateFr(f.annulee_le)} : {f.motif_annulation}</span></>}
+                        {av > 0 && <><br /><span className="note">Avoirs : − {fcfa(av)} FCFA HT</span></>}</td>
                       <td className="code">{codes.get(f.chantier_id)}</td>
                       <td className="num">{dateFr(f.date_emission)}</td>
                       <td className="num">{dateFr(f.echeance)}</td>
                       <td className="num">{fcfa(f.montant_ht)}</td>
                       <td className="num">{fcfa(f.montant_tva)}<br /><span className="note">{Number(f.taux_tva)} %</span></td>
-                      <td className="num"><b>{fcfa(f.montant_ttc)}</b></td>
-                      <td><Pastille texte={retard ? "En retard" : f.statut} ton={f.statut === "Payée" ? "ok" : retard ? "bad" : "warn"} /></td>
-                      <td>{f.statut === "Émise" && s.peut("fc.encaisser") && (
-                        <form action={encaisser}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="numero" value={f.numero} /><button className="btn sm ok">Encaisser</button></form>
-                      )}</td>
+                      <td className="num">{fcfa(f.montant_ttc)}</td>
+                      <td className="num">{Number(f.taux_aib) ? <>{fcfa(f.montant_aib)}<br /><span className="note">{Number(f.taux_aib)} %</span></> : "—"}</td>
+                      <td className="num"><b>{fcfa(f.net_a_payer)}</b></td>
+                      <td><Pastille texte={retard ? "En retard" : f.statut} ton={f.statut === "Payée" ? "ok" : f.statut === "Annulée" ? "bad" : retard ? "bad" : "warn"} /></td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <Link className="btn sm" href={`/finances/facture/${f.id}`}>Imprimer</Link>
+                        {f.statut === "Émise" && s.peut("fc.encaisser") && (
+                          <form action={encaisser}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="numero" value={f.numero} /><button className="btn sm ok">Encaisser</button></form>
+                        )}
+                        {corrige && f.statut !== "Annulée" && (
+                          <Correction id={f.id} numero={f.numero} quoi="la facture" annuler={f.statut === "Émise" && av === 0 ? annulerFactureClient : undefined}
+                            avoir={emettreAvoir} resteHt={Number(f.montant_ht) - av} />
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
-                {!liste.length && <tr><td colSpan={9} className="note">Aucune facture client.</td></tr>}
+                {!liste.length && <tr><td colSpan={11} className="note">Aucune facture client.</td></tr>}
               </tbody>
             </table>
           </div>
         </section>
+        {avoirs.length > 0 && (
+          <section className="panel">
+            <h2>Avoirs</h2>
+            <div className="tbl">
+              <table>
+                <thead><tr><th>Avoir</th><th>Sur la facture</th><th>Projet</th><th className="num">Date</th><th>Motif</th><th className="num">HT</th><th className="num">TVA</th><th className="num">TTC</th><th className="num">Net</th></tr></thead>
+                <tbody>
+                  {avoirs.map((a) => (
+                    <tr key={a.id}>
+                      <td className="code">{a.numero}</td><td className="code">{numFac.get(a.facture_id)}</td><td className="code">{codes.get(a.chantier_id)}</td>
+                      <td className="num">{dateFr(a.date_avoir)}</td><td>{a.motif}</td>
+                      <td className="num">− {fcfa(a.montant_ht)}</td><td className="num">− {fcfa(a.montant_tva)}</td><td className="num">− {fcfa(a.montant_ttc)}</td><td className="num"><b>− {fcfa(a.net_a_payer)}</b></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </>
     );
   }
@@ -141,38 +185,40 @@ export default async function Finances({ searchParams }: { searchParams: Promise
     const liste = data ?? [];
     const { data: bcs } = await supabase.from("bons_commande").select("id,numero,chantier_id,fournisseur,objet").eq("statut", "Validé").order("numero");
     const bonsValides: BcValide[] = (bcs ?? []).map((b) => ({ ...b, code: codes.get(b.chantier_id) ?? "" }));
-    const nonRejetees = liste.filter((f) => f.statut !== "Rejetée");
+    const nonRejetees = liste.filter((f) => f.statut !== "Rejetée" && f.statut !== "Annulée");
     const somme = (l: typeof liste, c: "montant_ht" | "montant_tva" | "montant_ttc") => l.reduce((a, f) => a + Number(f[c]), 0);
-    const aPayer = somme(liste.filter((f) => f.statut === "Reçue" || f.statut === "Validée"), "montant_ttc");
+    const aPayer = liste.filter((f) => f.statut === "Reçue" || f.statut === "Validée").reduce((a, f) => a + Number(f.net_a_payer), 0);
     const peutValider = (m: number) => s.peut("dep.valider_tout") || (s.peut("dep.valider") && m <= S);
     contenu = (
       <>
-        {s.peut("ff.enregistrer") && <FormFactureFournisseur chantiers={chantiers ?? []} pvs={await pvSignes("prestataire")} bons={bonsValides} />}
+        {s.peut("ff.enregistrer") && <FormFactureFournisseur chantiers={chantiers ?? []} pvs={await pvSignes("prestataire")} bons={bonsValides} tva={taux.tva} aib={aibs} />}
         <div className="kpis">
           <Kpi libelle="Total HT" valeur={fcfa(somme(nonRejetees, "montant_ht"))} unite="FCFA" />
           <Kpi libelle="TVA déductible" valeur={fcfa(somme(nonRejetees, "montant_tva"))} unite="FCFA" />
           <Kpi libelle="Total TTC" valeur={fcfa(somme(nonRejetees, "montant_ttc"))} unite="FCFA" />
-          <Kpi libelle="Reste à payer TTC" valeur={fcfa(aPayer)} unite="FCFA" ton={aPayer ? "hl" : undefined} />
+          <Kpi libelle="Reste à payer (net d'AIB)" valeur={fcfa(aPayer)} unite="FCFA" ton={aPayer ? "hl" : undefined} />
         </div>
         <section className="panel">
-          <p className="note">Circuit : la facture est enregistrée, puis reçoit un bon à payer (RAF jusqu&apos;à {fcfa(S)} FCFA, PDG ou DO au-delà), puis elle est payée. Personne ne valide une facture qu&apos;il a saisie.</p>
+          <p className="note">Circuit : la facture est enregistrée, puis reçoit un bon à payer (RAF jusqu&apos;à {fcfa(S)} FCFA, PDG ou DO au-delà), puis elle est payée. Personne ne valide une facture qu&apos;il a saisie. L&apos;AIB est retenu par DGS : le net à payer est le TTC moins l&apos;AIB. Une facture erronée non payée s&apos;annule avec un motif, puis se ressaisit.</p>
           <div className="tbl">
             <table>
-              <thead><tr><th>Fournisseur</th><th>Objet</th><th>Imputation</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Statut</th><th>Action</th></tr></thead>
+              <thead><tr><th>Fournisseur</th><th>Objet</th><th>Imputation</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th className="num">AIB</th><th className="num">Net à payer</th><th>Statut</th><th>Action</th></tr></thead>
               <tbody>
                 {liste.map((f) => {
                   const m = Number(f.montant_ht);
                   const decide = f.statut === "Reçue" && f.saisie_par !== s.profil.id && peutValider(m);
                   return (
-                    <tr key={f.id}>
-                      <td>{f.fournisseur}<br /><span className="code">{f.numero}</span></td>
+                    <tr key={f.id} className={f.statut === "Annulée" ? "annule" : undefined}>
+                      <td>{f.fournisseur}<br /><span className="code">{f.numero}</span>{f.statut === "Annulée" && <><br /><span className="note">Annulée le {dateFr(f.annulee_le)} : {f.motif_annulation}</span></>}</td>
                       <td>{f.objet}{(f.pv?.numero || f.bc?.numero) && <><br /><span className="note">{[f.pv?.numero && `PV ${f.pv.numero}`, f.bc?.numero && `BC ${f.bc.numero}`].filter(Boolean).join(" · ")}</span></>}</td>
                       <td>{f.chantier_id ? <span className="code">{codes.get(f.chantier_id)}</span> : <span className="dom">Frais généraux</span>}</td>
                       <td className="num">{dateFr(f.echeance)}{f.statut !== "Payée" && f.echeance && f.echeance < auj && <><br /><Pastille texte="Échue" ton="bad" /></>}</td>
                       <td className="num">{fcfa(m)}</td>
                       <td className="num">{fcfa(f.montant_tva)}<br /><span className="note">{Number(f.taux_tva) ? `${Number(f.taux_tva)} %` : "Exonérée"}</span></td>
-                      <td className="num"><b>{fcfa(f.montant_ttc)}</b></td>
-                      <td><Pastille texte={f.statut === "Validée" ? "Bon à payer" : f.statut} ton={f.statut === "Payée" || f.statut === "Validée" ? "ok" : f.statut === "Rejetée" ? "bad" : "warn"} /></td>
+                      <td className="num">{fcfa(f.montant_ttc)}</td>
+                      <td className="num">{Number(f.taux_aib) ? <>{fcfa(f.montant_aib)}<br /><span className="note">{Number(f.taux_aib)} %</span></> : "—"}</td>
+                      <td className="num"><b>{fcfa(f.net_a_payer)}</b></td>
+                      <td><Pastille texte={f.statut === "Validée" ? "Bon à payer" : f.statut} ton={f.statut === "Payée" || f.statut === "Validée" ? "ok" : f.statut === "Rejetée" || f.statut === "Annulée" ? "bad" : "warn"} /></td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         {decide && (
                           <span className="statusline">
@@ -183,11 +229,14 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                         {f.statut === "Validée" && s.peut("dep.payer") && (
                           <form action={payerFactureFournisseur}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="numero" value={f.numero} /><button className="btn sm">Payer</button></form>
                         )}
+                        {corrige && (f.statut === "Reçue" || f.statut === "Validée") && (
+                          <Correction id={f.id} numero={f.numero} quoi="la facture" annuler={annulerFactureFournisseur} />
+                        )}
                       </td>
                     </tr>
                   );
                 })}
-                {!liste.length && <tr><td colSpan={9} className="note">Aucune facture fournisseur.</td></tr>}
+                {!liste.length && <tr><td colSpan={11} className="note">Aucune facture fournisseur.</td></tr>}
               </tbody>
             </table>
           </div>
