@@ -32,6 +32,17 @@ export async function enregistrerDroits(_: unknown, f: FormData) {
   return { ok: ecarts.length ? `Droits de ${profil.nom} enregistrés.` : `${profil.nom} a les droits standards de son poste.` };
 }
 
+/** Le PDG et le DO accordent ou retirent l'accès groupe (travailler dans tous les pays). */
+export async function definirAccesGroupe(f: FormData) {
+  await exigerDroit("droits.gerer");
+  const supabase = await supabaseServeur();
+  const oui = txt(f, "oui") === "1";
+  const { error } = await supabase.rpc("definir_acces_groupe", { p_profil: txt(f, "profil_id"), p_oui: oui });
+  if (error) throw new Error(error.message);
+  await journaliser(`a ${oui ? "accordé" : "retiré"} l'accès groupe à ${txt(f, "nom")}`);
+  revalidatePath("/droits");
+}
+
 export async function changerPoste(f: FormData) {
   await exigerDroit("droits.gerer");
   const supabase = await supabaseServeur();

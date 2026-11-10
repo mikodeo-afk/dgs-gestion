@@ -2,7 +2,7 @@ import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { ORDRE_POSTES, PERIMETRE, POSTES, POSTES_TERRAIN, type Poste, type Profil } from "@/lib/types";
 import EditeurDroits from "./EditeurDroits";
-import { changerPoste } from "./actions";
+import { changerPoste, definirAccesGroupe } from "./actions";
 
 export default async function Droits({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
   const s = await exigerSession();
@@ -70,6 +70,27 @@ export default async function Droits({ searchParams }: { searchParams: Promise<{
             <button className="btn sm" type="submit">Changer le poste</button>
             <span className="note">Changer le poste remet ses droits standards.</span>
           </form>
+          {["pdg", "do"].includes(s.profil.poste) && (
+            <form className="statusline" action={definirAccesGroupe}>
+              <input type="hidden" name="profil_id" value={cible.id} />
+              <input type="hidden" name="nom" value={cible.nom} />
+              {["pdg", "do"].includes(cible.poste) ? (
+                <span className="note">Accès groupe : {cible.nom} travaille dans tous les pays (toujours, pour le PDG et le DO).</span>
+              ) : cible.acces_groupe ? (
+                <>
+                  <span className="note">{cible.nom} a l&apos;accès groupe : il peut travailler dans tous les pays.</span>
+                  <input type="hidden" name="oui" value="0" />
+                  <button className="btn sm bad" type="submit">Retirer l&apos;accès groupe</button>
+                </>
+              ) : (
+                <>
+                  <span className="note">{cible.nom} ne travaille qu&apos;au {s.tousPays.find((x) => x.code === cible.pays)?.nom ?? cible.pays}.</span>
+                  <input type="hidden" name="oui" value="1" />
+                  <button className="btn sm" type="submit">Accorder l&apos;accès groupe (tous les pays)</button>
+                </>
+              )}
+            </form>
+          )}
           <EditeurDroits
             key={cible.id}
             profilId={cible.id}

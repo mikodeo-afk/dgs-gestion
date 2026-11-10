@@ -1,6 +1,6 @@
-# DGS Bamako Gestion
+# DGS Gestion
 
-Application de gestion de DGS Bamako (D General Solutions) : chantiers et tâches, dépenses, finances, personnel, et droits par poste et par personne, du technicien au PDG.
+Application de gestion des filiales de D General Solutions (Mali, Bénin…), une seule interface pour tous les pays, chaque pays restant indépendant : chantiers et tâches, dépenses, finances, personnel, et droits par poste et par personne, du technicien au PDG.
 
 Chaque employé a son propre compte. Les droits sont vérifiés **dans la base de données** (Row Level Security de Supabase) : même en contournant l'écran, un employé ne peut ni voir ni modifier ce que son poste ne permet pas.
 
@@ -24,9 +24,13 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 
 À venir : l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation), l'impôt sur salaire (ITS) et les pièces jointes (photos de justificatifs).
 
+## Plusieurs pays
+
+À la connexion, chacun choisit son pays ; un compte ne fonctionne que dans le pays où il a été créé (les RH créent les comptes dans leur pays). Le PDG et le DO ont l'accès groupe et passent d'un pays à l'autre depuis l'en-tête ; ils peuvent accorder l'accès groupe à d'autres personnes (Rôles et droits). Toutes les données (chantiers, finances, paie, achats, paramètres comme la TVA) sont séparées par pays dans la base. Pour ajouter un pays : `insert into pays (code, nom, ville, ordre) values ('CI', 'Côte d''Ivoire', 'Abidjan', 3);` puis copier ses paramètres dans `parametres`.
+
 ## Mise en service
 
-1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0007`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré).
+1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0011`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré, et `0009` que `0008` le soit).
 2. **Vercel** : importer ce dépôt GitHub, puis renseigner les variables d'environnement (voir `.env.example`) :
    - `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API) ;
    - `SUPABASE_SERVICE_ROLE_KEY` (même page ; clé secrète, uniquement sur le serveur).
