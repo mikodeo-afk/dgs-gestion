@@ -15,7 +15,7 @@ export async function emettreFacture(_: unknown, f: FormData) {
     chantier_id: txt(f, "chantier_id"), objet: txt(f, "objet"), montant_ht: Number(txt(f, "montant_ht")), echeance: txt(f, "echeance"),
   }).select("numero").single();
   if (error) return { erreur: "La facture n'a pas été émise : " + error.message };
-  await journaliser(`a émis la facture ${data.numero} (${fcfa(Number(txt(f, "montant_ht")))} FCFA HT)`);
+  await journaliser(`a émis la facture ${data.numero} (${fcfa(Number(txt(f, "montant_ht")))} FCFA HT, ${fcfa(Math.round(Number(txt(f, "montant_ht")) * 1.18))} FCFA TTC)`);
   fin();
   return { ok: `Facture ${data.numero} émise.` };
 }
@@ -26,7 +26,7 @@ export async function enregistrerFactureFournisseur(_: unknown, f: FormData) {
   const ch = txt(f, "chantier_id");
   const { error } = await supabase.from("factures_fournisseurs").insert({
     fournisseur: txt(f, "fournisseur"), numero: txt(f, "numero"), chantier_id: ch === "FG" ? null : ch,
-    objet: txt(f, "objet"), montant_ht: Number(txt(f, "montant_ht")), echeance: txt(f, "echeance") || null,
+    objet: txt(f, "objet"), montant_ht: Number(txt(f, "montant_ht")), taux_tva: txt(f, "taux_tva") === "0" ? 0 : 18, echeance: txt(f, "echeance") || null,
   });
   if (error) return { erreur: error.code === "23505" ? "Cette facture de ce fournisseur est déjà enregistrée." : "La facture n'a pas été enregistrée : " + error.message };
   await journaliser(`a enregistré la facture ${txt(f, "numero")} de ${txt(f, "fournisseur")}`);

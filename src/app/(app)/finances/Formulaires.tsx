@@ -17,6 +17,7 @@ export function FormFactureClient({ chantiers }: { chantiers: Ch[] }) {
       <label>Projet<select id="fc-ch" name="chantier_id" required>{chantiers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.nom}</option>)}</select></label>
       <label>Objet<input id="fc-objet" name="objet" required placeholder="ex. Situation n°2" /></label>
       <label>Montant HT (FCFA)<input id="fc-ht" name="montant_ht" type="number" min="1" required /></label>
+      <p className="note" style={{ gridColumn: "1/-1" }}>La TVA (18 %) et le montant TTC sont calculés automatiquement.</p>
       <label>Échéance<input id="fc-ech" name="echeance" type="date" required /></label>
       <button className="btn pri" type="submit" disabled={enCours}>Émettre la facture</button>
       <Retour etat={etat} />
@@ -38,6 +39,12 @@ export function FormFactureFournisseur({ chantiers }: { chantiers: Ch[] }) {
         </select>
       </label>
       <label>Montant HT (FCFA)<input id="ff-ht" name="montant_ht" type="number" min="1" required /></label>
+      <label>TVA
+        <select id="ff-tva" name="taux_tva" defaultValue="18">
+          <option value="18">18 %</option>
+          <option value="0">Exonérée (0 %)</option>
+        </select>
+      </label>
       <label>Échéance<input id="ff-ech" name="echeance" type="date" /></label>
       <button className="btn pri" type="submit" disabled={enCours}>Enregistrer la facture</button>
       <Retour etat={etat} />

@@ -83,16 +83,23 @@ export default async function Finances({ searchParams }: { searchParams: Promise
   if (onglet === "clients") {
     const { data } = await supabase.from("factures_clients").select("*").order("date_emission", { ascending: false });
     const liste = data ?? [];
-    const du = liste.filter((f) => f.statut === "Émise").reduce((a, f) => a + Number(f.montant_ht) * (1 + Number(f.taux_tva) / 100), 0);
+    const actives = liste.filter((f) => f.statut !== "Annulée");
+    const somme = (l: typeof liste, c: "montant_ht" | "montant_tva" | "montant_ttc") => l.reduce((a, f) => a + Number(f[c]), 0);
+    const du = somme(liste.filter((f) => f.statut === "Émise"), "montant_ttc");
     contenu = (
       <>
         {s.peut("fc.emettre") && <FormFactureClient chantiers={chantiers ?? []} />}
-        <div className="kpis"><Kpi libelle="Reste à encaisser TTC" valeur={fcfa(du)} unite="FCFA" ton={du ? "hl" : undefined} /></div>
+        <div className="kpis">
+          <Kpi libelle="Facturé HT" valeur={fcfa(somme(actives, "montant_ht"))} unite="FCFA" />
+          <Kpi libelle="TVA facturée" valeur={fcfa(somme(actives, "montant_tva"))} unite="FCFA" />
+          <Kpi libelle="Facturé TTC" valeur={fcfa(somme(actives, "montant_ttc"))} unite="FCFA" />
+          <Kpi libelle="Reste à encaisser TTC" valeur={fcfa(du)} unite="FCFA" ton={du ? "hl" : undefined} />
+        </div>
         <section className="panel">
           <p className="note">Numéro attribué automatiquement. Une facture non payée après son échéance apparaît « En retard ».</p>
           <div className="tbl">
             <table>
-              <thead><tr><th>Facture</th><th>Projet</th><th className="num">Émise le</th><th className="num">Échéance</th><th className="num">HT</th><th className="num">TTC</th><th>Statut</th><th>Action</th></tr></thead>
+              <thead><tr><th>Facture</th><th>Projet</th><th className="num">Émise le</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Statut</th><th>Action</th></tr></thead>
               <tbody>
                 {liste.map((f) => {
                   const retard = f.statut === "Émise" && f.echeance < auj;
@@ -103,7 +110,8 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                       <td className="num">{dateFr(f.date_emission)}</td>
                       <td className="num">{dateFr(f.echeance)}</td>
                       <td className="num">{fcfa(f.montant_ht)}</td>
-                      <td className="num">{fcfa(Number(f.montant_ht) * (1 + Number(f.taux_tva) / 100))}</td>
+                      <td className="num">{fcfa(f.montant_tva)}<br /><span className="note">{Number(f.taux_tva)} %</span></td>
+                      <td className="num"><b>{fcfa(f.montant_ttc)}</b></td>
                       <td><Pastille texte={retard ? "En retard" : f.statut} ton={f.statut === "Payée" ? "ok" : retard ? "bad" : "warn"} /></td>
                       <td>{f.statut === "Émise" && s.peut("fc.encaisser") && (
                         <form action={encaisser}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="numero" value={f.numero} /><button className="btn sm ok">Encaisser</button></form>
@@ -111,7 +119,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                     </tr>
                   );
                 })}
-                {!liste.length && <tr><td colSpan={8} className="note">Aucune facture client.</td></tr>}
+                {!liste.length && <tr><td colSpan={9} className="note">Aucune facture client.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -127,15 +135,24 @@ export default async function Finances({ searchParams }: { searchParams: Promise
     ]);
     const S = Number(seuil ?? 2000000);
     const liste = data ?? [];
+    const nonRejetees = liste.filter((f) => f.statut !== "Rejetée");
+    const somme = (l: typeof liste, c: "montant_ht" | "montant_tva" | "montant_ttc") => l.reduce((a, f) => a + Number(f[c]), 0);
+    const aPayer = somme(liste.filter((f) => f.statut === "Reçue" || f.statut === "Validée"), "montant_ttc");
     const peutValider = (m: number) => s.peut("dep.valider_tout") || (s.peut("dep.valider") && m <= S);
     contenu = (
       <>
         {s.peut("ff.enregistrer") && <FormFactureFournisseur chantiers={chantiers ?? []} />}
+        <div className="kpis">
+          <Kpi libelle="Total HT" valeur={fcfa(somme(nonRejetees, "montant_ht"))} unite="FCFA" />
+          <Kpi libelle="TVA déductible" valeur={fcfa(somme(nonRejetees, "montant_tva"))} unite="FCFA" />
+          <Kpi libelle="Total TTC" valeur={fcfa(somme(nonRejetees, "montant_ttc"))} unite="FCFA" />
+          <Kpi libelle="Reste à payer TTC" valeur={fcfa(aPayer)} unite="FCFA" ton={aPayer ? "hl" : undefined} />
+        </div>
         <section className="panel">
           <p className="note">Circuit : la facture est enregistrée, puis reçoit un bon à payer (RAF jusqu&apos;à {fcfa(S)} FCFA, PDG ou DO au-delà), puis elle est payée. Personne ne valide une facture qu&apos;il a saisie.</p>
           <div className="tbl">
             <table>
-              <thead><tr><th>Fournisseur</th><th>Objet</th><th>Imputation</th><th className="num">Échéance</th><th className="num">HT</th><th>Statut</th><th>Action</th></tr></thead>
+              <thead><tr><th>Fournisseur</th><th>Objet</th><th>Imputation</th><th className="num">Échéance</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Statut</th><th>Action</th></tr></thead>
               <tbody>
                 {liste.map((f) => {
                   const m = Number(f.montant_ht);
@@ -147,6 +164,8 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                       <td>{f.chantier_id ? <span className="code">{codes.get(f.chantier_id)}</span> : <span className="dom">Frais généraux</span>}</td>
                       <td className="num">{dateFr(f.echeance)}{f.statut !== "Payée" && f.echeance && f.echeance < auj && <><br /><Pastille texte="Échue" ton="bad" /></>}</td>
                       <td className="num">{fcfa(m)}</td>
+                      <td className="num">{fcfa(f.montant_tva)}<br /><span className="note">{Number(f.taux_tva) ? `${Number(f.taux_tva)} %` : "Exonérée"}</span></td>
+                      <td className="num"><b>{fcfa(f.montant_ttc)}</b></td>
                       <td><Pastille texte={f.statut === "Validée" ? "Bon à payer" : f.statut} ton={f.statut === "Payée" || f.statut === "Validée" ? "ok" : f.statut === "Rejetée" ? "bad" : "warn"} /></td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         {decide && (
@@ -162,7 +181,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                     </tr>
                   );
                 })}
-                {!liste.length && <tr><td colSpan={7} className="note">Aucune facture fournisseur.</td></tr>}
+                {!liste.length && <tr><td colSpan={9} className="note">Aucune facture fournisseur.</td></tr>}
               </tbody>
             </table>
           </div>
