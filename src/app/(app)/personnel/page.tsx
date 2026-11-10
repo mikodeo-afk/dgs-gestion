@@ -35,7 +35,7 @@ export default async function Personnel() {
       <div className="head">
         <div>
           <h1>{s.profil.poste === "tech" ? "Ma fiche" : "Personnel"}</h1>
-          <p className="sub">{s.global ? "Tout le personnel de DGS Bamako." : "Vous et votre équipe."}</p>
+          <p className="sub">{s.global ? `Tout le personnel de DGS ${s.pays.nom}.` : "Vous et votre équipe."}</p>
         </div>
       </div>
       {voitSal && (
