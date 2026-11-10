@@ -31,7 +31,7 @@ export default async function TableauDeBord() {
       <div className="head">
         <div>
           <h1>Bonjour {s.profil.nom.split(" ")[0]}</h1>
-          <p className="sub">{POSTES[s.profil.poste].nom}. Voici l&apos;avancement des activités de DGS Bamako.</p>
+          <p className="sub">{POSTES[s.profil.poste].nom}. Voici l&apos;avancement des activités de DGS {s.pays.nom}.</p>
         </div>
       </div>
       <div className="kpis">

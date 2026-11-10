@@ -22,6 +22,9 @@ select pg_temp.check(pg_temp.echoue($$select decider_depense('20000000-0000-0000
 select pg_temp.check((select count(*) from depenses)=2, 'le chef de projet voit les dépenses de son chantier');
 commit;
 
+-- PV client signé (base de la facture)
+insert into pv_execution (id,chantier_id,type,tiers,objet,montant_ht,statut,signe_le,initie_par) values ('30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','client','Client TEL','Acompte 30 %',7800000,'Signé',current_date,'00000000-0000-0000-0000-000000000006');
+
 -- RAF : valide sous le seuil, pas au-dessus ; paie
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';
 select decider_depense('20000000-0000-0000-0000-000000000001', true);
@@ -29,7 +32,7 @@ select pg_temp.check((select statut from depenses where id='20000000-0000-0000-0
 select pg_temp.check(pg_temp.echoue($$select decider_depense('20000000-0000-0000-0000-000000000002', true)$$), 'le RAF ne valide pas 3 600 000 FCFA');
 select payer_depense('20000000-0000-0000-0000-000000000001');
 select pg_temp.check((select statut from depenses where id='20000000-0000-0000-0000-000000000001')='Payée', 'le RAF marque la dépense payée');
-insert into factures_clients (chantier_id,objet,montant_ht,echeance) values ('10000000-0000-0000-0000-000000000001','Acompte 30 %',7800000,current_date+15);
+insert into factures_clients (pv_id,objet,echeance) values ('30000000-0000-0000-0000-000000000001','Acompte 30 %',current_date+15);
 select pg_temp.check((select numero from factures_clients) = 'FAC-' || to_char(current_date,'YYYY') || '-001', 'la facture client est numérotée automatiquement');
 select encaisser_facture((select id from factures_clients limit 1));
 insert into frais_generaux (mois,categorie,libelle,montant) values (date_trunc('month',current_date),'Loyer','Loyer bureau',600000);

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DGS Bamako Gestion",
-  description: "Suivi des chantiers, dépenses, finances et personnel de DGS Bamako.",
+  title: "DGS Gestion",
+  description: "Suivi des chantiers, dépenses, finances et personnel des filiales DGS.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
