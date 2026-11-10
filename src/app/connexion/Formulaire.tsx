@@ -8,6 +8,8 @@ export default function Formulaire({ inactif, pays }: { inactif: boolean; pays: 
   return (
     <form action={action}>
       <div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="logo" src="/logo-dgs-fond.png" alt="DGS, D General Solutions" />
         <h1>DGS Gestion</h1>
         <p className="sub">Choisissez votre pays, puis connectez-vous avec le compte créé par les RH de ce pays.</p>
       </div>

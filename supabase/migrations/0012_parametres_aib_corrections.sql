@@ -241,3 +241,26 @@ $$;
 
 grant select, insert, update, delete on public.avoirs_clients to authenticated;
 grant execute on all functions in schema public to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Identité légale de chaque filiale (en-tête des factures et documents)
+-- ---------------------------------------------------------------------------
+alter table public.pays
+  add column raison_sociale text,
+  add column rccm text,
+  add column ifu text,
+  add column adresse text,
+  add column telephone text,
+  add column email text;
+update public.pays set raison_sociale = 'D General Solutions', rccm = 'RB/ABC/24 B 8333', ifu = '3202493386287' where code = 'BJ';
+update public.pays set raison_sociale = 'D General Solutions' where code = 'ML';
+
+create or replace function public.definir_identite(p_raison text, p_rccm text, p_ifu text, p_adresse text, p_telephone text, p_email text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.a_droit('param.gerer') then raise exception 'Vous n''avez pas le droit de modifier l''identité de la filiale.'; end if;
+  update pays set raison_sociale = nullif(trim(p_raison), ''), rccm = nullif(trim(p_rccm), ''), ifu = nullif(trim(p_ifu), ''),
+                  adresse = nullif(trim(p_adresse), ''), telephone = nullif(trim(p_telephone), ''), email = nullif(trim(p_email), '')
+  where code = public.pays_courant();
+end $$;
+grant execute on function public.definir_identite(text, text, text, text, text, text) to authenticated;

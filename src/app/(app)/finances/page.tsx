@@ -136,6 +136,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                       <td className="num"><b>{fcfa(f.net_a_payer)}</b></td>
                       <td><Pastille texte={retard ? "En retard" : f.statut} ton={f.statut === "Payée" ? "ok" : f.statut === "Annulée" ? "bad" : retard ? "bad" : "warn"} /></td>
                       <td style={{ whiteSpace: "nowrap" }}>
+                        <Link className="btn sm" href={`/finances/facture/${f.id}`}>Imprimer</Link>
                         {f.statut === "Émise" && s.peut("fc.encaisser") && (
                           <form action={encaisser}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="numero" value={f.numero} /><button className="btn sm ok">Encaisser</button></form>
                         )}

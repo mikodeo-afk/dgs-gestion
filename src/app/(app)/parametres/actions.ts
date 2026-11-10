@@ -20,3 +20,16 @@ export async function modifierParametre(_: Etat, f: FormData): Promise<Etat> {
   revalidatePath("/", "layout");
   return { ok: "Enregistré." };
 }
+
+export async function modifierIdentite(_: Etat, f: FormData): Promise<Etat> {
+  const s = await exigerDroit("param.gerer");
+  const t = (k: string) => String(f.get(k) ?? "").trim();
+  const supabase = await supabaseServeur();
+  const { error } = await supabase.rpc("definir_identite", {
+    p_raison: t("raison_sociale"), p_rccm: t("rccm"), p_ifu: t("ifu"), p_adresse: t("adresse"), p_telephone: t("telephone"), p_email: t("email"),
+  });
+  if (error) return { erreur: error.message };
+  await journaliser(`a mis à jour l'identité légale de DGS ${s.pays.nom} (RCCM, IFU, coordonnées)`);
+  revalidatePath("/", "layout");
+  return { ok: "Identité enregistrée. Elle figure sur les factures." };
+}

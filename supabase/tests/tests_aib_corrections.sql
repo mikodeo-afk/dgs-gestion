@@ -80,3 +80,15 @@ select pg_temp.check((select statut from pv_execution where objet='PV erroné') 
 select pg_temp.check(pg_temp.echoue($$select annuler_pv((select id from pv_execution where objet='PV AIB'), 'x')$$), 'il n''annule pas un PV facturé');
 commit;
 \echo 'Tous les tests des paramètres, de l''AIB et des corrections passent.'
+
+-- Identité légale
+select pg_temp.check((select rccm = 'RB/ABC/24 B 8333' and ifu = '3202493386287' from pays where code='BJ'), 'RCCM et IFU du Bénin enregistrés');
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000006';
+select pg_temp.check(pg_temp.echoue($$select definir_identite('X','X','X','X','X','X')$$), 'un chef de projet ne change pas l''identité légale');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';
+select definir_identite('D General Solutions SARL','MA.BKO.2026.B.1','123','Bamako','','');
+select pg_temp.check((select rccm = 'MA.BKO.2026.B.1' and telephone is null from pays where code='ML'), 'le RAF renseigne l''identité de son pays');
+select pg_temp.check((select rccm from pays where code='BJ') = 'RB/ABC/24 B 8333', 'sans toucher à l''autre pays');
+commit;
+\echo 'Identité légale : OK.'

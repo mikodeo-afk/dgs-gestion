@@ -31,7 +31,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <>
       <header className="top">
         <div className="brand">
-          DGS {s.pays.nom} <small>Gestion des activités{s.pays.ville ? ` · ${s.pays.ville}` : ""}</small>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-dgs.png" alt="DGS" />
+          {s.pays.nom} <small>Gestion des activités{s.pays.ville ? ` · ${s.pays.ville}` : ""}</small>
         </div>
         <div className="who">
           {s.groupe && s.tousPays.length > 1 && (
