@@ -163,3 +163,12 @@ form.ligne{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 form.ligne select,form.ligne input{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 6px}
 .tabs a{padding:8px 12px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none}
 .tabs a[aria-selected="true"]{color:var(--accent);border-color:var(--accent);font-weight:600}
+/* Corrections : annulation avec motif, avoirs */
+details.corr summary{list-style:none;display:inline-block}
+details.corr summary::-webkit-details-marker{display:none}
+details.corr[open]>div{display:grid;gap:8px;margin-top:6px;min-width:230px;white-space:normal}
+details.corr form{display:grid;gap:6px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:8px}
+details.corr label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+details.corr input{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 7px;min-width:0}
+tr.annule td{color:var(--muted)}
+tr.annule .code{text-decoration:line-through}

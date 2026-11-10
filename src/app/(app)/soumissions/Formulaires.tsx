@@ -17,7 +17,7 @@ export function FormProforma() {
       <label>Objet de la soumission<input id="pf-objet" name="objet" required placeholder="ex. AO pose fibre lot 2" /></label>
       <label>Domaine<select id="pf-dom" name="domaine">{["BTP", "Énergie", "Télécoms"].map((d) => <option key={d}>{d}</option>)}</select></label>
       <label>Montant HT (FCFA)<input id="pf-ht" name="montant_ht" type="number" min="1" required /></label>
-      <label>TVA<select id="pf-tva" name="taux_tva" defaultValue="18"><option value="18">18 %</option><option value="0">Exonérée (0 %)</option></select></label>
+      <label>TVA<select id="pf-tva" name="taux_tva" defaultValue="18"><option value="18">Taux du pays</option><option value="0">Exonérée (0 %)</option></select></label>
       <label>Date limite de dépôt<input id="pf-date" name="date_limite" type="date" /></label>
       <label style={{ gridColumn: "1/-1" }}>Précisions<input id="pf-det" name="details" /></label>
       <button className="btn pri" type="submit" disabled={enCours}>Envoyer pour visa (DG et DO)</button>

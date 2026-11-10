@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   liens.push({ href: "/rh", libelle: terrain ? "Mon espace RH" : "Ressources humaines" });
   liens.push({ href: "/personnel", libelle: terrain ? "Ma fiche" : "Personnel" });
   liens.push({ href: "/droits", libelle: s.peut("droits.gerer") ? "Rôles et droits" : "Mes droits" });
+  if (s.peut("param.gerer")) liens.push({ href: "/parametres", libelle: "Paramètres" });
 
   return (
     <>
