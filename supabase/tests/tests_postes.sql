@@ -12,8 +12,9 @@ update profils set actif=true, poste='commercial' where id='00000000-0000-0000-0
 update profils set actif=true, poste='rla' where id='00000000-0000-0000-0000-000000000021';
 insert into remunerations values ('00000000-0000-0000-0000-000000000021', 600000);
 
+insert into pv_execution (id,chantier_id,type,tiers,objet,montant_ht,statut,signe_le,initie_par) values ('30000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','client','Client ENR','Acompte 40 %',12800000,'Signé',current_date,'00000000-0000-0000-0000-000000000006');
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000020';
-insert into factures_clients (chantier_id,objet,montant_ht,echeance) values ('10000000-0000-0000-0000-000000000002','Acompte 40 %',12800000,current_date+20);
+insert into factures_clients (pv_id,objet,echeance) values ('30000000-0000-0000-0000-000000000002','Acompte 40 %',current_date+20);
 select pg_temp.check(true,'le responsable commercial émet une facture client');
 select pg_temp.check((select count(*) from rentabilite_chantiers())=2, 'le responsable commercial voit la rentabilité de tous les projets');
 select pg_temp.check(pg_temp.echoue($$select encaisser_facture((select id from factures_clients order by cree_le desc limit 1))$$), 'le responsable commercial n''encaisse pas');

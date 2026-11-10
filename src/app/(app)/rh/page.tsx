@@ -234,7 +234,7 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
       <div className="head">
         <div>
           <h1>{s.profil.poste === "tech" ? "Mon espace RH" : "Ressources humaines"}</h1>
-          <p className="sub">Présences, paie et contrats du personnel de DGS Bamako.</p>
+          <p className="sub">Présences, paie et contrats du personnel de DGS {s.pays.nom}.</p>
         </div>
       </div>
       <div className="tabs" role="tablist">

@@ -11,7 +11,7 @@ export default function FormChantier({ chefs }: { chefs: { id: string; nom: stri
         <select id="domaine" name="domaine"><option>BTP</option><option>Énergie</option><option>Télécoms</option></select>
       </label>
       <label>Client<input id="client" name="client" /></label>
-      <label>Lieu<input id="lieu" name="lieu" placeholder="ex. Bamako, Commune IV" /></label>
+      <label>Lieu<input id="lieu" name="lieu" placeholder="ex. Commune IV, Bamako" /></label>
       <label>Chef de projet
         <select id="chef_projet_id" name="chef_projet_id">
           <option value="">À désigner</option>
