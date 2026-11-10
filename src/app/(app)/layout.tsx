@@ -14,6 +14,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (s.peut("tache.maj") || s.peut("tache.creer")) liens.push({ href: "/taches", libelle: terrain ? "Mes tâches" : "Tâches" });
   if (s.peut("dep.demander") || s.peut("dep.valider") || s.peut("dep.valider_tout") || s.peut("dep.payer") || (s.global && s.peut("fin.voir")))
     liens.push({ href: "/depenses", libelle: "Dépenses" });
+  if (s.peut("da.demander") || s.peut("bc.initier") || s.peut("bc.valider") || s.peut("fin.voir"))
+    liens.push({ href: "/achats", libelle: "Achats" });
   if (s.peut("fin.voir")) liens.push({ href: "/finances", libelle: "Finances" });
   liens.push({ href: "/rh", libelle: terrain ? "Mon espace RH" : "Ressources humaines" });
   liens.push({ href: "/personnel", libelle: terrain ? "Ma fiche" : "Personnel" });
