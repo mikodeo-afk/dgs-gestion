@@ -29,7 +29,12 @@ export type Profil = {
   date_fin: string | null;
   visage_enregistre: boolean;
   actif: boolean;
+  pays: string;
+  acces_groupe: boolean;
+  pays_actif: string | null;
 };
+
+export type Pays = { code: string; nom: string; ville: string | null; devise: string };
 
 export type Chantier = {
   id: string;
