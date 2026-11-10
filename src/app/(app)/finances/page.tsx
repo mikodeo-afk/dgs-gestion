@@ -4,7 +4,7 @@ import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { aujourdhui, dateFr, fcfa } from "@/lib/format";
 import { Kpi, Pastille } from "@/components/ui";
-import { FormFactureClient, FormFactureFournisseur, FormFraisGeneral } from "./Formulaires";
+import { FormFactureClient, FormFactureFournisseur, FormFraisGeneral, type BcValide, type PvSigne } from "./Formulaires";
 import { deciderFactureFournisseur, encaisser, payerFactureFournisseur } from "./actions";
 
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -28,6 +28,10 @@ export default async function Finances({ searchParams }: { searchParams: Promise
   const supabase = await supabaseServeur();
   const { data: chantiers } = await supabase.from("chantiers").select("id,code,nom").order("code");
   const codes = new Map((chantiers ?? []).map((c) => [c.id, c.code]));
+  const pvSignes = async (type: "client" | "prestataire"): Promise<PvSigne[]> => {
+    const { data } = await supabase.from("pv_execution").select("id,numero,chantier_id,tiers,objet,montant_ht").eq("type", type).eq("statut", "Signé").order("numero");
+    return (data ?? []).map((p) => ({ ...p, code: codes.get(p.chantier_id) ?? "" }));
+  };
 
   let contenu: React.ReactNode = null;
   if (onglet === "rentabilite") {
@@ -81,14 +85,14 @@ export default async function Finances({ searchParams }: { searchParams: Promise
   }
 
   if (onglet === "clients") {
-    const { data } = await supabase.from("factures_clients").select("*").order("date_emission", { ascending: false });
+    const { data } = await supabase.from("factures_clients").select("*, pv:pv_execution(numero)").order("date_emission", { ascending: false });
     const liste = data ?? [];
     const actives = liste.filter((f) => f.statut !== "Annulée");
     const somme = (l: typeof liste, c: "montant_ht" | "montant_tva" | "montant_ttc") => l.reduce((a, f) => a + Number(f[c]), 0);
     const du = somme(liste.filter((f) => f.statut === "Émise"), "montant_ttc");
     contenu = (
       <>
-        {s.peut("fc.emettre") && <FormFactureClient chantiers={chantiers ?? []} />}
+        {s.peut("fc.emettre") && <FormFactureClient pvs={await pvSignes("client")} />}
         <div className="kpis">
           <Kpi libelle="Facturé HT" valeur={fcfa(somme(actives, "montant_ht"))} unite="FCFA" />
           <Kpi libelle="TVA facturée" valeur={fcfa(somme(actives, "montant_tva"))} unite="FCFA" />
@@ -105,7 +109,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                   const retard = f.statut === "Émise" && f.echeance < auj;
                   return (
                     <tr key={f.id}>
-                      <td><span className="code">{f.numero}</span><br />{f.objet}</td>
+                      <td><span className="code">{f.numero}</span><br />{f.objet}{f.pv?.numero && <><br /><span className="note">PV {f.pv.numero}</span></>}</td>
                       <td className="code">{codes.get(f.chantier_id)}</td>
                       <td className="num">{dateFr(f.date_emission)}</td>
                       <td className="num">{dateFr(f.echeance)}</td>
@@ -130,18 +134,20 @@ export default async function Finances({ searchParams }: { searchParams: Promise
 
   if (onglet === "fournisseurs") {
     const [{ data }, { data: seuil }] = await Promise.all([
-      supabase.from("factures_fournisseurs").select("*").order("date_reception", { ascending: false }),
+      supabase.from("factures_fournisseurs").select("*, pv:pv_execution(numero), bc:bons_commande(numero)").order("date_reception", { ascending: false }),
       supabase.rpc("parametre", { p_cle: "seuil_validation" }),
     ]);
     const S = Number(seuil ?? 2000000);
     const liste = data ?? [];
+    const { data: bcs } = await supabase.from("bons_commande").select("id,numero,chantier_id,fournisseur,objet").eq("statut", "Validé").order("numero");
+    const bonsValides: BcValide[] = (bcs ?? []).map((b) => ({ ...b, code: codes.get(b.chantier_id) ?? "" }));
     const nonRejetees = liste.filter((f) => f.statut !== "Rejetée");
     const somme = (l: typeof liste, c: "montant_ht" | "montant_tva" | "montant_ttc") => l.reduce((a, f) => a + Number(f[c]), 0);
     const aPayer = somme(liste.filter((f) => f.statut === "Reçue" || f.statut === "Validée"), "montant_ttc");
     const peutValider = (m: number) => s.peut("dep.valider_tout") || (s.peut("dep.valider") && m <= S);
     contenu = (
       <>
-        {s.peut("ff.enregistrer") && <FormFactureFournisseur chantiers={chantiers ?? []} />}
+        {s.peut("ff.enregistrer") && <FormFactureFournisseur chantiers={chantiers ?? []} pvs={await pvSignes("prestataire")} bons={bonsValides} />}
         <div className="kpis">
           <Kpi libelle="Total HT" valeur={fcfa(somme(nonRejetees, "montant_ht"))} unite="FCFA" />
           <Kpi libelle="TVA déductible" valeur={fcfa(somme(nonRejetees, "montant_tva"))} unite="FCFA" />
@@ -160,7 +166,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
                   return (
                     <tr key={f.id}>
                       <td>{f.fournisseur}<br /><span className="code">{f.numero}</span></td>
-                      <td>{f.objet}</td>
+                      <td>{f.objet}{(f.pv?.numero || f.bc?.numero) && <><br /><span className="note">{[f.pv?.numero && `PV ${f.pv.numero}`, f.bc?.numero && `BC ${f.bc.numero}`].filter(Boolean).join(" · ")}</span></>}</td>
                       <td>{f.chantier_id ? <span className="code">{codes.get(f.chantier_id)}</span> : <span className="dom">Frais généraux</span>}</td>
                       <td className="num">{dateFr(f.echeance)}{f.statut !== "Payée" && f.echeance && f.echeance < auj && <><br /><Pastille texte="Échue" ton="bad" /></>}</td>
                       <td className="num">{fcfa(m)}</td>
