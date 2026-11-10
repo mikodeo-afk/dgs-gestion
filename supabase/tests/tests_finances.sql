@@ -41,6 +41,20 @@ select pg_temp.check(pg_temp.echoue($$select decider_facture_fournisseur((select
 select pg_temp.check((select count(*) from frais_generaux_du_mois(current_date)) = 2, 'les frais généraux du mois comptent la saisie et les salaires administratifs');
 commit;
 
+-- Le fournisseur est enregistré, avec son dossier et une attestation fiscale valide
+insert into tiers (id, pays, type, nom) values ('50000000-0000-0000-0000-000000000001', 'ML', 'fournisseur', 'Quincaillerie');
+insert into justificatifs (pays, objet, objet_id, chemin, nom_fichier, type_document) values
+  ('ML', 'tiers', '50000000-0000-0000-0000-000000000001', 'ML/tiers/50000000-0000-0000-0000-000000000001/rccm.pdf', 'rccm.pdf', 'RCCM');
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000002';
+select pg_temp.check(pg_temp.echoue($$select decider_facture_fournisseur((select id from factures_fournisseurs limit 1), true)$$), 'pas de bon à payer sans fournisseur enregistré');
+commit;
+update factures_fournisseurs set tiers_id = '50000000-0000-0000-0000-000000000001' where numero = 'Q-1';
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000002';
+select pg_temp.check(pg_temp.echoue($$select decider_facture_fournisseur((select id from factures_fournisseurs limit 1), true)$$), 'pas de bon à payer sans attestation fiscale valide');
+commit;
+insert into justificatifs (pays, objet, objet_id, chemin, nom_fichier, type_document, valide_jusquau) values
+  ('ML', 'tiers', '50000000-0000-0000-0000-000000000001', 'ML/tiers/50000000-0000-0000-0000-000000000001/arf.pdf', 'arf.pdf', 'Attestation de régularité fiscale', current_date + 90);
+
 -- DO : valide au-dessus du seuil, pas sa propre demande
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000002';
 select decider_depense('20000000-0000-0000-0000-000000000002', true);

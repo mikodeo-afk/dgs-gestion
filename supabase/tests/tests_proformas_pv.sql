@@ -44,7 +44,9 @@ begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0
 insert into pv_execution (chantier_id,type,tiers,objet,avancement,montant_ht) values ('10000000-0000-0000-0000-000000000001','client','Client TEL','Situation n°2',60,5200000);
 insert into pv_execution (chantier_id,type,tiers,objet,montant_ht) values ('10000000-0000-0000-0000-000000000001','prestataire','Sous-traitant génie civil','Tranchées 2 km',2400000);
 select pg_temp.check((select count(*) from pv_execution where objet in ('Situation n°2','Tranchées 2 km')) = 2, 'le chef de projet établit des PV client et prestataire');
+insert into justificatifs (objet,objet_id,chemin,nom_fichier) select 'pv', id, pays||'/pv/'||id||'/signe.pdf', 'signe.pdf' from pv_execution where id = (select id from pv_execution where objet='Situation n°2');
 select signer_pv((select id from pv_execution where objet='Situation n°2'));
+insert into justificatifs (objet,objet_id,chemin,nom_fichier) select 'pv', id, pays||'/pv/'||id||'/signe.pdf', 'signe.pdf' from pv_execution where id = (select id from pv_execution where objet='Tranchées 2 km');
 select signer_pv((select id from pv_execution where objet='Tranchées 2 km'));
 select pg_temp.check((select count(*) from pv_execution where statut='Signé' and objet in ('Situation n°2','Tranchées 2 km')) = 2, 'le chef de projet enregistre la signature');
 commit;

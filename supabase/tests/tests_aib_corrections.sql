@@ -26,6 +26,7 @@ select pg_temp.check((select valeur from parametres where pays='BJ' and cle='aib
 -- Facture client avec AIB, puis annulation et refacturation du même PV
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000006';
 insert into pv_execution (chantier_id,type,tiers,objet,montant_ht) values ('10000000-0000-0000-0000-000000000001','client','Client AIB','PV AIB',1000000);
+insert into justificatifs (objet,objet_id,chemin,nom_fichier) select 'pv', id, pays||'/pv/'||id||'/signe.pdf', 'signe.pdf' from pv_execution where id = (select id from pv_execution where objet='PV AIB');
 select signer_pv((select id from pv_execution where objet='PV AIB'));
 commit;
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';

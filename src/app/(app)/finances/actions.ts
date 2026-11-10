@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { exigerDroit, exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/journal";
@@ -31,12 +32,12 @@ export async function enregistrerFactureFournisseur(_: unknown, f: FormData) {
   const ch = txt(f, "chantier_id");
   const { tva } = await tauxDuPays();
   const { error } = await supabase.from("factures_fournisseurs").insert({
-    fournisseur: txt(f, "fournisseur"), numero: txt(f, "numero"), chantier_id: ch === "FG" ? null : ch,
+    tiers_id: txt(f, "tiers_id"), fournisseur: "-", numero: txt(f, "numero"), chantier_id: ch === "FG" ? null : ch,
     pv_id: txt(f, "pv_id") || null, bon_commande_id: txt(f, "bon_commande_id") || null,
-    objet: txt(f, "objet"), montant_ht: Number(txt(f, "montant_ht")), taux_tva: txt(f, "taux_tva") === "0" ? 0 : tva, taux_aib: taux(txt(f, "taux_aib")), echeance: txt(f, "echeance") || null,
+    objet: txt(f, "objet"), montant_ht: Number(txt(f, "montant_ht")) || (txt(f, "pv_id") ? 1 : 0), taux_tva: txt(f, "taux_tva") === "0" ? 0 : tva, taux_aib: taux(txt(f, "taux_aib")), echeance: txt(f, "echeance") || null,
   });
   if (error) return { erreur: error.code === "23505" ? "Cette facture de ce fournisseur est déjà enregistrée (ou son PV est déjà facturé)." : "La facture n'a pas été enregistrée : " + error.message };
-  await journaliser(`a enregistré la facture ${txt(f, "numero")} de ${txt(f, "fournisseur")}`);
+  await journaliser(`a enregistré la facture fournisseur ${txt(f, "numero")}`);
   fin();
   return { ok: "Facture fournisseur enregistrée." };
 }
@@ -57,7 +58,8 @@ async function rpc(nom: string, args: Record<string, unknown>, message: string) 
   await exigerSession();
   const supabase = await supabaseServeur();
   const { error } = await supabase.rpc(nom, args);
-  if (error) throw new Error(error.message);
+  const onglet = nom === "encaisser_facture" ? "clients" : "fournisseurs";
+  if (error) redirect(`/finances?onglet=${onglet}&erreur=${encodeURIComponent(error.message)}`);
   await journaliser(message);
   fin();
 }

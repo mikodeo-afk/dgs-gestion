@@ -14,10 +14,14 @@ export default async function FactureImprimable({ params }: { params: Promise<{ 
   const { data: f } = await supabase.from("factures_clients")
     .select("*, pv:pv_execution(numero,tiers,objet,date_pv,avancement), chantier:chantiers(code,nom)").eq("id", id).maybeSingle();
   if (!f) notFound();
-  const [{ data: ident }, { data: avs }] = await Promise.all([
+  const [{ data: ident }, { data: avs }, { data: lg }, { data: cli }] = await Promise.all([
     supabase.from("pays").select("*").eq("code", f.pays).maybeSingle(),
     supabase.from("avoirs_clients").select("numero,date_avoir,motif,montant_ht,net_a_payer").eq("facture_id", id).order("numero"),
+    f.pv_id ? supabase.from("pv_lignes").select("designation,unite,quantite,prix_unitaire_ht,montant_ht").eq("pv_id", f.pv_id).order("cree_le") : Promise.resolve({ data: [] }),
+    f.pv_id ? supabase.from("pv_execution").select("tiers:tiers(nom,ifu,rccm,adresse)").eq("id", f.pv_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const lignes = (lg ?? []) as { designation: string; unite: string; quantite: number; prix_unitaire_ht: number; montant_ht: number }[];
+  const client = (cli as { tiers?: { nom: string; ifu: string | null; rccm: string | null; adresse: string | null } | null } | null)?.tiers ?? null;
   const e = (ident ?? {}) as Partial<Identite>;
   const avoirs = avs ?? [];
   const tva = Number(f.taux_tva), aib = Number(f.taux_aib);
@@ -48,18 +52,25 @@ export default async function FactureImprimable({ params }: { params: Promise<{ 
 
         <h2>Facture n° {f.numero}</h2>
         <div className="bloc">
-          <div><b>Client</b><br />{f.pv?.tiers ?? "—"}</div>
+          <div><b>Client</b><br />{client?.nom ?? f.pv?.tiers ?? "—"}{client?.adresse && <><br />{client.adresse}</>}{client?.ifu && <><br />IFU : {client.ifu}</>}{client?.rccm && <><br />RCCM : {client.rccm}</>}</div>
           <div><b>Projet</b><br />{f.chantier?.code} · {f.chantier?.nom}</div>
           <div><b>Date</b> : {dateFr(f.date_emission)}<br /><b>Échéance</b> : {dateFr(f.echeance)}</div>
         </div>
 
+        {f.pv && <p style={{ fontSize: 13 }}>{f.objet} · selon PV d&apos;exécution {f.pv.numero} du {dateFr(f.pv.date_pv)}{f.pv.avancement != null ? `, avancement ${f.pv.avancement} %` : ""}</p>}
         <table>
-          <thead><tr><th>Désignation</th><th className="num">Montant HT (FCFA)</th></tr></thead>
+          <thead><tr><th>Désignation</th><th>Unité</th><th className="num">Quantité</th><th className="num">PU HT</th><th className="num">Montant HT (FCFA)</th></tr></thead>
           <tbody>
-            <tr>
-              <td>{f.objet}{f.pv && <><br /><small>Selon PV d&apos;exécution {f.pv.numero} du {dateFr(f.pv.date_pv)}{f.pv.avancement != null ? `, avancement ${f.pv.avancement} %` : ""} : {f.pv.objet}</small></>}</td>
-              <td className="num">{fcfa(f.montant_ht)}</td>
-            </tr>
+            {lignes.map((l, i) => (
+              <tr key={i}>
+                <td>{l.designation}</td><td>{l.unite}</td>
+                <td className="num">{Number(l.quantite).toLocaleString("fr-FR", { maximumFractionDigits: 3 })}</td>
+                <td className="num">{fcfa(l.prix_unitaire_ht)}</td><td className="num">{fcfa(l.montant_ht)}</td>
+              </tr>
+            ))}
+            {!lignes.length && (
+              <tr><td colSpan={4}>{f.objet}{f.pv && <><br /><small>{f.pv.objet}</small></>}</td><td className="num">{fcfa(f.montant_ht)}</td></tr>
+            )}
           </tbody>
         </table>
 

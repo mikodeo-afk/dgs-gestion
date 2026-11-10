@@ -1,5 +1,5 @@
 import { exigerSession } from "@/lib/session";
-import { POSTES } from "@/lib/types";
+import { POSTES, VOIT_TIERS } from "@/lib/types";
 import Nav from "./Nav";
 import { changerPays } from "./pays-actions";
 
@@ -21,6 +21,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     liens.push({ href: "/soumissions", libelle: "Soumissions" });
   if (s.peut("da.demander") || s.peut("bc.initier") || s.peut("bc.valider") || s.peut("fin.voir"))
     liens.push({ href: "/achats", libelle: "Achats" });
+  if (VOIT_TIERS.some((d) => s.peut(d)))
+    liens.push({ href: "/tiers", libelle: "Clients et fournisseurs" });
   if (s.peut("fin.voir")) liens.push({ href: "/finances", libelle: "Finances" });
   liens.push({ href: "/rh", libelle: terrain ? "Mon espace RH" : "Ressources humaines" });
   liens.push({ href: "/personnel", libelle: terrain ? "Ma fiche" : "Personnel" });

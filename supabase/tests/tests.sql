@@ -89,4 +89,6 @@ commit;
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000099';
 select pg_temp.check((select count(*) from chantiers)=0 and (select count(*) from profils)=0, 'un compte inactif ne voit aucune donnée');
 commit;
+-- Les chantiers créés pendant ces tests sont ouverts pour la suite (voir tests_quantitatifs pour l'ouverture).
+update chantiers set validation = 'Validé', ouverture = 'Tests';
 \echo 'Tous les tests de droits passent.'

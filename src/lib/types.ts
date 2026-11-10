@@ -51,6 +51,7 @@ export type Chantier = {
   date_debut: string;
   statut: string;
   rayon_pointage: number;
+  validation?: "À valider" | "Validé";
 };
 
 export type Tache = {
@@ -61,3 +62,11 @@ export type Tache = {
   avancement: number;
   echeance: string | null;
 };
+
+export type Tiers = {
+  id: string; type: "client" | "fournisseur" | "prestataire"; nom: string; ifu: string | null; rccm: string | null;
+  adresse: string | null; telephone: string | null; email: string | null; contact: string | null; actif: boolean;
+};
+export type LigneBordereau = { id: string; tiers_id: string; code: string | null; designation: string; unite: string; prix_unitaire_ht: number; actif: boolean };
+export const TYPES_TIERS: Record<Tiers["type"], string> = { client: "Client", fournisseur: "Fournisseur", prestataire: "Prestataire" };
+export const VOIT_TIERS = ["tiers.gerer", "fin.voir", "pv.initier", "chantier.creer", "fc.emettre", "ff.enregistrer", "bc.initier", "da.demander", "pf.initier"];
