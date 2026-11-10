@@ -52,3 +52,28 @@ export async function avancerPaie(f: FormData) {
   await journaliser(`a passé la paie de ${txt(f, "libelle")} à « ${txt(f, "statut")} »`);
   revalidatePath("/rh");
 }
+
+/** Contrôle d'un selfie de pointage : conforme, ou rejeté avec un motif (l'agent passe alors absent). */
+export async function controlerPointage(_: unknown, f: FormData) {
+  await exigerDroit("pres.saisir");
+  const supabase = await supabaseServeur();
+  const conforme = txt(f, "decision") === "conforme";
+  const { error } = await supabase.rpc("controler_pointage", {
+    p_profil: txt(f, "profil_id"), p_jour: txt(f, "jour"), p_conforme: conforme, p_motif: txt(f, "motif") || null,
+  });
+  if (error) return { erreur: error.message };
+  await journaliser(`a ${conforme ? "validé" : "rejeté"} le pointage de ${txt(f, "nom")} du ${txt(f, "jour").split("-").reverse().join("/")}`);
+  revalidatePath("/rh");
+  return { ok: conforme ? "Conforme." : "Rejeté : absent ce jour." };
+}
+
+/** Enregistre la photo de référence d'un agent, déjà déposée dans le stockage par le navigateur. */
+export async function definirPhotoReference(profilId: string, chemin: string, nom: string) {
+  await exigerDroit("pres.saisir");
+  const supabase = await supabaseServeur();
+  const { error } = await supabase.rpc("definir_photo_reference", { p_profil: profilId, p_chemin: chemin });
+  if (error) return { erreur: error.message };
+  await journaliser(`a enregistré la photo de référence de ${nom}`);
+  revalidatePath("/rh");
+  return { ok: "Photo de référence enregistrée." };
+}

@@ -12,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/", libelle: "Tableau de bord" },
     { href: "/chantiers", libelle: "Chantiers" },
   ];
+  if (s.peut("pointer")) liens.splice(1, 0, { href: "/pointage", libelle: "Je pointe" });
   if (s.peut("tache.maj") || s.peut("tache.creer")) liens.push({ href: "/taches", libelle: terrain ? "Mes tâches" : "Tâches" });
   if (s.peut("dep.demander") || s.peut("dep.valider") || s.peut("dep.valider_tout") || s.peut("dep.payer") || (s.global && s.peut("fin.voir")))
     liens.push({ href: "/depenses", libelle: "Dépenses" });

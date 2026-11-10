@@ -35,6 +35,8 @@ export async function creerChantier(_: unknown, f: FormData) {
   redirect(`/chantiers/${data.id}`);
 }
 
+const coord = (v: string) => (v && Number.isFinite(Number(v.replace(",", "."))) ? Number(v.replace(",", ".")) : null);
+
 export async function modifierChantier(f: FormData) {
   await exigerDroit("chantier.creer");
   const supabase = await supabaseServeur();
@@ -43,6 +45,7 @@ export async function modifierChantier(f: FormData) {
     .from("chantiers")
     .update({
       statut: txt(f, "statut"), chef_projet_id: txt(f, "chef_projet_id") || null, rayon_pointage: num(f, "rayon") || 300,
+      latitude: coord(txt(f, "latitude")), longitude: coord(txt(f, "longitude")),
       ...(txt(f, "client_id") ? { client_id: txt(f, "client_id"), client: (await supabase.from("tiers").select("nom").eq("id", txt(f, "client_id")).maybeSingle()).data?.nom ?? null } : {}),
     })
     .eq("id", id);

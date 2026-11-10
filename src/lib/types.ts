@@ -28,6 +28,7 @@ export type Profil = {
   date_embauche: string;
   date_fin: string | null;
   visage_enregistre: boolean;
+  photo_reference?: string | null;
   actif: boolean;
   pays: string;
   acces_groupe: boolean;
@@ -51,6 +52,8 @@ export type Chantier = {
   date_debut: string;
   statut: string;
   rayon_pointage: number;
+  latitude?: number | null;
+  longitude?: number | null;
   validation?: "À valider" | "Validé";
 };
 

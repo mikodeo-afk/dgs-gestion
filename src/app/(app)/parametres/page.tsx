@@ -6,12 +6,13 @@ import FormParametre from "./FormParametre";
 import FormIdentite from "./FormIdentite";
 import type { Identite } from "@/lib/types";
 
-const ORDRE = ["tva", "aib", "seuil_validation", "inps_salarie", "jours_ouvres_mois"];
+const ORDRE = ["tva", "aib", "seuil_validation", "inps_salarie", "jours_ouvres_mois", "precision_gps_max"];
 const NOM: Record<string, string> = {
   tva: "TVA", aib: "AIB par défaut", seuil_validation: "Seuil de validation",
   inps_salarie: "Retenue sociale salariale", jours_ouvres_mois: "Jours ouvrés par mois",
+  precision_gps_max: "Précision GPS du pointage",
 };
-const unite = (cle: string) => (cle === "seuil_validation" ? "FCFA" : cle === "jours_ouvres_mois" ? "jours" : "%");
+const unite = (cle: string) => (cle === "seuil_validation" ? "FCFA" : cle === "jours_ouvres_mois" ? "jours" : cle === "precision_gps_max" ? "m" : "%");
 
 export default async function Parametres() {
   const s = await exigerSession();
