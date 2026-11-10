@@ -1,6 +1,7 @@
 "use client";
 import { useActionState } from "react";
 import { creerChantier } from "./actions";
+import BoutonPosition from "@/components/BoutonPosition";
 
 export default function FormChantier({ chefs, clients }: { chefs: { id: string; nom: string }[]; clients: { id: string; nom: string }[] }) {
   const [etat, action, enCours] = useActionState(creerChantier, null);
@@ -28,6 +29,7 @@ export default function FormChantier({ chefs, clients }: { chefs: { id: string; 
       <label>Latitude du site<input id="latitude" name="latitude" placeholder="ex. 12.6360" inputMode="decimal" /></label>
       <label>Longitude du site<input id="longitude" name="longitude" placeholder="ex. -8.0250" inputMode="decimal" /></label>
       <label>Rayon de pointage (m)<input id="rayon" name="rayon" type="number" min="50" max="2000" step="50" defaultValue={300} /></label>
+      <span style={{ alignSelf: "end" }}><BoutonPosition /></span>
       <button className="btn pri" type="submit" disabled={enCours}>{enCours ? "Création…" : "Créer le chantier"}</button>
       <p className="note" style={{ gridColumn: "1/-1" }}>Le client se choisit parmi les clients enregistrés (menu Clients et fournisseurs). Après la création, sur la fiche du chantier : déposez le bon de commande du client (le chantier s&apos;ouvre aussitôt ; sinon le DG ou le DO valide son ouverture), puis ajoutez les activités à mener et leurs quantitatifs prévisionnels.</p>
       {etat?.erreur && <p className="erreur" style={{ gridColumn: "1/-1" }}>{etat.erreur}</p>}

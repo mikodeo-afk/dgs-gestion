@@ -4,14 +4,16 @@ import { supabaseServeur } from "@/lib/supabase/server";
 import { dateFr, fcfa } from "@/lib/format";
 import FormParametre from "./FormParametre";
 import FormIdentite from "./FormIdentite";
+import FormBureau from "./FormBureau";
 import type { Identite } from "@/lib/types";
 
-const ORDRE = ["tva", "aib", "seuil_validation", "inps_salarie", "jours_ouvres_mois"];
+const ORDRE = ["tva", "aib", "seuil_validation", "inps_salarie", "jours_ouvres_mois", "precision_gps_max"];
 const NOM: Record<string, string> = {
   tva: "TVA", aib: "AIB par défaut", seuil_validation: "Seuil de validation",
   inps_salarie: "Retenue sociale salariale", jours_ouvres_mois: "Jours ouvrés par mois",
+  precision_gps_max: "Précision GPS du pointage",
 };
-const unite = (cle: string) => (cle === "seuil_validation" ? "FCFA" : cle === "jours_ouvres_mois" ? "jours" : "%");
+const unite = (cle: string) => (cle === "seuil_validation" ? "FCFA" : cle === "jours_ouvres_mois" ? "jours" : cle === "precision_gps_max" ? "m" : "%");
 
 export default async function Parametres() {
   const s = await exigerSession();
@@ -37,6 +39,15 @@ export default async function Parametres() {
         <h2>Identité légale de DGS {s.pays.nom}</h2>
         <p className="note">Ces mentions figurent en en-tête de chaque facture de {s.pays.nom}.</p>
         {ident && <FormIdentite id={ident as Identite} />}
+      </section>
+      <section className="panel">
+        <h2>Bureau DGS {s.pays.nom} · zone de pointage</h2>
+        <p className="note">
+          Tout le personnel pointe au bureau par défaut. Une personne affectée à un chantier (chef de projet du chantier ou tâche en cours)
+          pointe sur ce chantier, dans le rayon fixé sur sa fiche. Pour enregistrer le bureau, ouvrez cette page sur votre téléphone
+          au bureau et touchez « Utiliser ma position actuelle ».
+        </p>
+        {ident && <FormBureau lat={(ident as { bureau_latitude: number | null }).bureau_latitude} lon={(ident as { bureau_longitude: number | null }).bureau_longitude} rayon={(ident as { bureau_rayon?: number }).bureau_rayon ?? 200} />}
       </section>
       <section className="panel">
         <h2>Taux et seuils</h2>

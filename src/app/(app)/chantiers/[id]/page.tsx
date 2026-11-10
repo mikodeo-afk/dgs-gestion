@@ -1,3 +1,4 @@
+import BoutonPosition from "@/components/BoutonPosition";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { exigerSession } from "@/lib/session";
@@ -81,7 +82,7 @@ export default async function FicheChantier({ params }: { params: Promise<{ id: 
       <div className="kpis">
         <Kpi libelle="Avancement" valeur={`${Math.round(progression)} %`} />
         <Kpi libelle="Chef de projet" valeur={<span style={{ fontSize: 17 }}>{ch.chef_projet_id ? noms.get(ch.chef_projet_id) : "À désigner"}</span>} />
-        <Kpi libelle="Rayon de pointage" valeur={ch.rayon_pointage} unite="m" />
+        <Kpi libelle="Rayon de pointage" valeur={ch.latitude != null ? ch.rayon_pointage : "Position à saisir"} unite={ch.latitude != null ? "m" : undefined} />
         {fin && <Kpi libelle="Marché HT" valeur={fcfa(fin.montant_marche)} unite="FCFA" />}
       </div>
       {s.peut("chantier.creer") && (
@@ -105,7 +106,10 @@ export default async function FicheChantier({ params }: { params: Promise<{ id: 
               {((clients ?? []) as { id: string; nom: string }[]).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
             </select>
           </label>
+          <label>Latitude du site<input id="latitude" name="latitude" inputMode="decimal" defaultValue={ch.latitude ?? ""} placeholder="ex. 12.6360" /></label>
+          <label>Longitude du site<input id="longitude" name="longitude" inputMode="decimal" defaultValue={ch.longitude ?? ""} placeholder="ex. -8.0250" /></label>
           <label>Rayon de pointage (m)<input id="rayon" name="rayon" type="number" min="50" max="2000" step="50" defaultValue={ch.rayon_pointage} /></label>
+          <span style={{ alignSelf: "end" }}><BoutonPosition /></span>
           <button className="btn" type="submit">Enregistrer le chantier</button>
         </form>
       )}

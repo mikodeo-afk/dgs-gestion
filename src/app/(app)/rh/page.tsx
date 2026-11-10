@@ -5,6 +5,7 @@ import { aujourdhui, dateFr, fcfa, heureFr } from "@/lib/format";
 import { POSTES, type Profil } from "@/lib/types";
 import { Kpi, Pastille } from "@/components/ui";
 import { FormPaie, FormPresences } from "./Formulaires";
+import { ControlePointage, PhotoReference } from "./Pointages";
 import { avancerPaie, ouvrirPaie } from "./actions";
 
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -55,6 +56,18 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
     const carte = new Map((pres ?? []).map((p) => [`${p.profil_id}|${p.jour}`, p.statut]));
     const duJour = new Map((presJour ?? []).map((p) => [p.profil_id, p]));
     const saisissables = s.peut("pres.saisir") ? visibles : [];
+    // Pointages par téléphone du jour, avec selfie et photo de référence (RH et direction).
+    const controleur = s.global && s.peut("pres.saisir");
+    const pointes = controleur ? (presJour ?? []).filter((p) => p.photo_chemin) : [];
+    const chemins = [...pointes.map((p) => p.photo_chemin as string), ...tous.map((p) => p.photo_reference).filter((x): x is string => !!x)];
+    const liens = new Map<string, string>();
+    if (chemins.length) {
+      const { data: urls } = await supabase.storage.from("pointages").createSignedUrls(chemins, 900);
+      for (const u of urls ?? []) if (u.path && u.signedUrl) liens.set(u.path, u.signedUrl);
+    }
+    const { data: chs } = pointes.length ? await supabase.from("chantiers").select("id,code").in("id", pointes.map((p) => p.chantier_id).filter(Boolean)) : { data: [] };
+    const codes = new Map((chs ?? []).map((c) => [c.id, c.code]));
+    const parId = new Map(tous.map((p) => [p.id, p]));
     contenu = (
       <>
         {saisissables.length > 0 && (
@@ -78,6 +91,60 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
                 return { id: a.id, nom: a.nom, poste: POSTES[a.poste].court, statut: p?.statut ?? "", pointage: p?.heure_arrivee ? `${heureFr(p.heure_arrivee)}${p.score_visage ? ` · visage ${p.score_visage} %` : ""}` : "" };
               })}
             />
+          </section>
+        )}
+        {controleur && (
+          <section className="panel">
+            <h2>Pointages par téléphone du {dateFr(jour)}</h2>
+            <p className="note">Comparez chaque selfie à la photo de référence de l&apos;agent. Un pointage rejeté le rend absent ce jour-là (retenue sur la paie).</p>
+            {pointes.length === 0 ? <p className="note">Aucun pointage par téléphone ce jour.</p> : (
+              <div className="tbl">
+                <table>
+                  <thead><tr><th>Agent</th><th>Photos</th><th>Arrivée</th><th>Contrôle</th></tr></thead>
+                  <tbody>
+                    {pointes.map((p) => {
+                      const a = parId.get(p.profil_id);
+                      const ref = a?.photo_reference ? liens.get(a.photo_reference) : undefined;
+                      const selfie = liens.get(p.photo_chemin);
+                      return (
+                        <tr key={p.profil_id}>
+                          <td><b>{a?.nom ?? "—"}</b><br /><span className="note">{a ? POSTES[a.poste].court : ""}</span></td>
+                          <td>
+                            <div className="selfies">
+                              <figure>{selfie ? <a href={selfie} target="_blank" rel="noopener"><img src={selfie} alt={`Selfie de ${a?.nom}`} /></a> : <span className="vide">Selfie indisponible</span>}Selfie</figure>
+                              <figure>{ref ? <img src={ref} alt={`Photo de référence de ${a?.nom}`} /> : <span className="vide">Pas de photo de référence</span>}Référence</figure>
+                            </div>
+                          </td>
+                          <td>{heureFr(p.heure_arrivee)} · {p.chantier_id ? codes.get(p.chantier_id) ?? "Chantier" : "Bureau"}<br /><span className="note">à {p.distance_m} m{p.precision_m ? ` (GPS ± ${p.precision_m} m)` : ""}</span></td>
+                          <td>
+                            {p.controle === "À contrôler"
+                              ? <ControlePointage profilId={p.profil_id} nom={a?.nom ?? ""} jour={jour} />
+                              : <><Pastille texte={p.controle} ton={p.controle === "Conforme" ? "ok" : "bad"} />{p.motif_rejet && <span className="note"> {p.motif_rejet}</span>}</>}
+                            {a && !a.photo_reference && <div style={{ marginTop: 6 }}><PhotoReference profilId={a.id} nom={a.nom} pays={s.pays.code} existe={false} /></div>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <details style={{ marginTop: 10 }}>
+              <summary>Photos de référence du personnel ({tous.filter((p) => p.photo_reference).length}/{tous.length})</summary>
+              <div className="tbl">
+                <table>
+                  <tbody>
+                    {tous.map((a) => (
+                      <tr key={a.id}>
+                        <td>{a.nom}<br /><span className="note">{POSTES[a.poste].court}</span></td>
+                        <td><div className="selfies"><figure>{a.photo_reference && liens.get(a.photo_reference) ? <img src={liens.get(a.photo_reference)} alt={`Photo de référence de ${a.nom}`} /> : <span className="vide">Aucune</span>}</figure></div></td>
+                        <td><PhotoReference profilId={a.id} nom={a.nom} pays={s.pays.code} existe={!!a.photo_reference} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
           </section>
         )}
         <section className="panel">

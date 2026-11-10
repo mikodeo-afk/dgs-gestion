@@ -33,3 +33,19 @@ export async function modifierIdentite(_: Etat, f: FormData): Promise<Etat> {
   revalidatePath("/", "layout");
   return { ok: "Identité enregistrée. Elle figure sur les factures." };
 }
+
+/** Position et rayon du bureau DGS : zone de pointage de ceux qui ne sont affectés à aucun chantier. */
+export async function definirBureau(_: Etat, f: FormData): Promise<Etat> {
+  const s = await exigerDroit("param.gerer");
+  const n = (k: string) => Number(String(f.get(k) ?? "").replace(",", ".").trim());
+  const lat = n("latitude"), lon = n("longitude"), rayon = Math.round(n("rayon")) || 200;
+  if (!String(f.get("latitude") ?? "").trim() || !Number.isFinite(lat) || !Number.isFinite(lon)) return { erreur: "Saisissez la latitude et la longitude, ou utilisez votre position au bureau." };
+  if (rayon < 50 || rayon > 2000) return { erreur: "Le rayon doit être entre 50 et 2 000 m." };
+  const supabase = await supabaseServeur();
+  const { error } = await supabase.rpc("definir_bureau", { p_lat: lat, p_lon: lon, p_rayon: rayon });
+  if (error) return { erreur: error.message };
+  await journaliser(`a réglé la position du bureau (${s.pays.nom}, rayon ${rayon} m)`);
+  revalidatePath("/parametres");
+  revalidatePath("/pointage");
+  return { ok: "Position du bureau enregistrée." };
+}
