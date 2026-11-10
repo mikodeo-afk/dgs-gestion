@@ -20,7 +20,7 @@ export async function creerEmploye(_: unknown, f: FormData) {
 
   const admin = supabaseAdmin();
   const { data, error } = await admin.auth.admin.createUser({
-    email: txt(f, "email"), password: motdepasse, email_confirm: true, user_metadata: { nom: txt(f, "nom") },
+    email: txt(f, "email"), password: motdepasse, email_confirm: true, user_metadata: { nom: txt(f, "nom"), pays: s.pays.code },
   });
   if (error || !data.user) return { erreur: "Le compte n'a pas été créé : " + (error?.message ?? "erreur inconnue") };
   const id = data.user.id;
