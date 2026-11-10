@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { supabaseNavigateur } from "@/lib/supabase/navigateur";
 import { pointer } from "./actions";
 
-type ChantierPointage = { id: string; code: string; nom: string; latitude: number; longitude: number; rayon_pointage: number };
+/** Lieu de pointage : un chantier d'affectation, ou le bureau (id vide). */
+export type Lieu = { id: string | null; code: string; nom: string; latitude: number; longitude: number; rayon_pointage: number };
 
 function distance(a: number, b: number, c: number, d: number) {
   const r = (x: number) => (x * Math.PI) / 180;
@@ -32,8 +33,8 @@ function position(): Promise<GeolocationPosition> {
   });
 }
 
-export default function Pointer({ chantiers, agentId, pays }: { chantiers: ChantierPointage[]; agentId: string; pays: string }) {
-  const [choix, setChoix] = useState(chantiers.length === 1 ? chantiers[0].id : "");
+export default function Pointer({ chantiers, agentId, pays }: { chantiers: Lieu[]; agentId: string; pays: string }) {
+  const [choix, setChoix] = useState(chantiers.length === 1 ? chantiers[0].id ?? "bureau" : "");
   const [etape, setEtape] = useState("");
   const [msg, setMsg] = useState<{ ok?: string; erreur?: string } | null>(null);
   const champ = useRef<HTMLInputElement>(null);
@@ -44,10 +45,10 @@ export default function Pointer({ chantiers, agentId, pays }: { chantiers: Chant
     try {
       setEtape("Recherche de votre position…");
       const p = await position();
-      const c = chantiers.find((x) => x.id === choix)!;
+      const c = chantiers.find((x) => (x.id ?? "bureau") === choix)!;
       const d = Math.round(distance(p.coords.latitude, p.coords.longitude, c.latitude, c.longitude));
       if (d > c.rayon_pointage) {
-        throw new Error(`Vous êtes à ${d} m du chantier ${c.code} (rayon autorisé : ${c.rayon_pointage} m). Rapprochez-vous du site pour pointer.`);
+        throw new Error(`Vous êtes à ${d} m ${c.id ? `du chantier ${c.code}` : "du bureau"} (rayon autorisé : ${c.rayon_pointage} m). Rapprochez-vous pour pointer.`);
       }
       setEtape("Envoi du selfie…");
       const photo = await reduire(f);
@@ -69,20 +70,20 @@ export default function Pointer({ chantiers, agentId, pays }: { chantiers: Chant
   return (
     <div className="pointage">
       {chantiers.length > 1 && (
-        <label>Chantier où vous êtes
+        <label>Chantier où vous êtes affecté
           <select value={choix} onChange={(e) => setChoix(e.target.value)}>
             <option value="">— Choisir —</option>
-            {chantiers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.nom}</option>)}
+            {chantiers.map((c) => <option key={c.id ?? "bureau"} value={c.id ?? "bureau"}>{c.code} · {c.nom}</option>)}
           </select>
         </label>
       )}
-      {chantiers.length === 1 && <p>Chantier : <b>{chantiers[0].code} · {chantiers[0].nom}</b></p>}
+      {chantiers.length === 1 && <p>Lieu de pointage : <b>{chantiers[0].id ? `${chantiers[0].code} · ${chantiers[0].nom}` : chantiers[0].nom}</b></p>}
       <label className={`btn pri gros ${!choix || etape ? "inactif" : ""}`} aria-disabled={!choix || !!etape}>
         {etape || "📸 Je pointe : prendre mon selfie"}
         <input ref={champ} type="file" accept="image/*" capture="user" hidden disabled={!choix || !!etape}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) envoyer(f); }} />
       </label>
-      <p className="note">Votre position est vérifiée au moment du pointage : vous devez être sur le site. Le selfie est contrôlé par les RH.</p>
+      <p className="note">Votre position est vérifiée au moment du pointage : vous devez être sur place. Le selfie est contrôlé par les RH.</p>
       {msg?.erreur && <p className="erreur">{msg.erreur}</p>}
       {msg?.ok && <p className="succes">{msg.ok}</p>}
     </div>

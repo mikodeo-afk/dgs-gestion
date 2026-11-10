@@ -1,6 +1,6 @@
 -- DGS Gestion : pointage de l'arrivée par téléphone (GPS + selfie), contrôlé par les RH.
--- L'agent pointe lui-même depuis le site ouvert sur son téléphone : sa position doit être dans le
--- rayon du chantier, et un selfie est pris. Les RH comparent ensuite le selfie à la photo de
+-- Chacun pointe lui-même depuis le site ouvert sur son téléphone : au bureau DGS par défaut, sur son
+-- chantier s'il y est affecté ; sa position doit être dans le rayon du lieu, et un selfie est pris. Les RH comparent ensuite le selfie à la photo de
 -- référence de l'agent et marquent le pointage conforme ou rejeté (rejeté = absent).
 -- La reconnaissance faciale automatique viendra avec l'application mobile.
 
@@ -63,23 +63,46 @@ end $$;
 create trigger garde_photo_reference before update on public.profils
 for each row execute function public.garde_photo_reference();
 
--- Chantiers où l'agent peut pointer : ceux de son périmètre dont la position est connue.
+-- Zone de pointage par défaut : le bureau DGS du pays (position réglée dans Paramètres).
+alter table public.pays
+  add column bureau_latitude  double precision,
+  add column bureau_longitude double precision,
+  add column bureau_rayon     int not null default 200 check (bureau_rayon between 50 and 2000);
+
+create or replace function public.definir_bureau(p_lat double precision, p_lon double precision, p_rayon int)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.a_droit('param.gerer') then raise exception 'Vous n''avez pas le droit de régler le bureau.'; end if;
+  if p_lat not between -90 and 90 or p_lon not between -180 and 180 then raise exception 'Position invalide.'; end if;
+  update pays set bureau_latitude = p_lat, bureau_longitude = p_lon, bureau_rayon = coalesce(p_rayon, 200)
+  where code = public.pays_courant();
+end $$;
+
+-- Tout le personnel pointe : au bureau par défaut, sur son chantier s'il y est affecté.
+insert into public.permissions_poste (poste, cle)
+select p, 'pointer' from unnest(enum_range(null::public.poste)) p
+on conflict do nothing;
+
+-- Chantiers où la personne est affectée : chef de projet du chantier, ou tâche en cours qui lui est confiée,
+-- sur un chantier en démarrage ou en cours de son pays.
 create or replace function public.chantiers_pointage()
 returns table (id uuid, code text, nom text, latitude double precision, longitude double precision, rayon_pointage int)
 language sql stable security definer set search_path = public as $$
   select c.id, c.code, c.nom, c.latitude, c.longitude, c.rayon_pointage
   from chantiers c
-  where c.id in (select public.mes_chantiers()) and c.pays = public.pays_courant()
-    and c.latitude is not null and c.longitude is not null and c.statut in ('Démarrage','En cours')
+  where c.pays = public.pays_courant() and c.statut in ('Démarrage','En cours')
+    and (c.chef_projet_id = auth.uid()
+         or exists (select 1 from taches t where t.chantier_id = c.id and t.assigne_id = auth.uid() and t.avancement < 100))
   order by c.code
 $$;
 
--- L'agent pointe son arrivée : position dans le rayon du chantier, selfie déposé dans son dossier.
+-- La personne pointe son arrivée (p_chantier vide = bureau) : position dans le rayon, selfie déposé dans son dossier.
 create or replace function public.pointer(p_chantier uuid, p_lat double precision, p_lon double precision, p_precision int, p_photo text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_uid uuid := auth.uid();
-  c chantiers;
+  v_pays text := public.pays_courant();
+  v_lieu text; v_clat double precision; v_clon double precision; v_rayon int;
   v_distance int;
   v_max int;
   v_deja timestamptz;
@@ -87,26 +110,37 @@ begin
   if v_uid is null or not public.a_droit('pointer') then
     raise exception 'Vous n''avez pas le droit de pointer.';
   end if;
-  select * into c from chantiers where id = p_chantier;
-  if c.id is null or c.id not in (select public.mes_chantiers()) or c.pays <> public.pays_courant() then
-    raise exception 'Ce chantier ne fait pas partie de vos chantiers.';
-  end if;
-  if c.latitude is null or c.longitude is null then
-    raise exception 'La position du chantier % n''est pas renseignée : demandez au chef de projet de l''enregistrer.', c.code;
+  if p_chantier is null then
+    if exists (select 1 from public.chantiers_pointage()) then
+      raise exception 'Vous êtes affecté à un chantier : pointez sur ce chantier.';
+    end if;
+    select 'le bureau', bureau_latitude, bureau_longitude, bureau_rayon into v_lieu, v_clat, v_clon, v_rayon from pays where code = v_pays;
+    if v_clat is null then
+      raise exception 'La position du bureau n''est pas encore enregistrée : demandez-le à la direction (Paramètres).';
+    end if;
+  else
+    select 'le chantier ' || x.code, x.latitude, x.longitude, x.rayon_pointage into v_lieu, v_clat, v_clon, v_rayon
+    from public.chantiers_pointage() x where x.id = p_chantier;
+    if v_lieu is null then
+      raise exception 'Vous n''êtes pas affecté à ce chantier.';
+    end if;
+    if v_clat is null or v_clon is null then
+      raise exception 'La position du chantier n''est pas renseignée : demandez au chef de projet de l''enregistrer.';
+    end if;
   end if;
   if p_lat is null or p_lon is null or p_lat not between -90 and 90 or p_lon not between -180 and 180 then
     raise exception 'Position GPS invalide.';
   end if;
-  if coalesce(p_photo, '') not like public.pays_courant() || '/' || v_uid || '/%' then
+  if coalesce(p_photo, '') not like v_pays || '/' || v_uid || '/%' then
     raise exception 'Le selfie est obligatoire pour pointer.';
   end if;
-  select coalesce((select valeur::int from parametres where pays = c.pays and cle = 'precision_gps_max'), 150) into v_max;
+  select coalesce((select valeur::int from parametres where pays = v_pays and cle = 'precision_gps_max'), 150) into v_max;
   if p_precision is not null and p_precision > v_max then
     raise exception 'Position GPS trop imprécise (± % m). Mettez-vous à découvert, attendez quelques secondes et réessayez.', p_precision;
   end if;
-  v_distance := round(public.distance_m(p_lat, p_lon, c.latitude, c.longitude));
-  if v_distance > c.rayon_pointage then
-    raise exception 'Vous êtes à % m du chantier %, hors du rayon de pointage (% m).', v_distance, c.code, c.rayon_pointage;
+  v_distance := round(public.distance_m(p_lat, p_lon, v_clat, v_clon));
+  if v_distance > v_rayon then
+    raise exception 'Vous êtes à % m de %, hors du rayon de pointage (% m).', v_distance, v_lieu, v_rayon;
   end if;
   select heure_arrivee into v_deja from presences where profil_id = v_uid and jour = current_date and heure_arrivee is not null;
   if v_deja is not null then
@@ -116,13 +150,13 @@ begin
   perform set_config('dgs.pointage', 'on', true);
   insert into presences (profil_id, jour, statut, heure_arrivee, chantier_id, distance_m, latitude, longitude, precision_m,
                          photo_chemin, controle, saisi_par, maj_le)
-  values (v_uid, current_date, 'P', now(), c.id, v_distance, p_lat, p_lon, p_precision, p_photo, 'À contrôler', v_uid, now())
+  values (v_uid, current_date, 'P', now(), p_chantier, v_distance, p_lat, p_lon, p_precision, p_photo, 'À contrôler', v_uid, now())
   on conflict (profil_id, jour) do update set
-    statut = 'P', heure_arrivee = now(), chantier_id = c.id, distance_m = v_distance, latitude = p_lat, longitude = p_lon,
+    statut = 'P', heure_arrivee = now(), chantier_id = p_chantier, distance_m = v_distance, latitude = p_lat, longitude = p_lon,
     precision_m = p_precision, photo_chemin = p_photo, controle = 'À contrôler', controle_par = null, controle_le = null,
     motif_rejet = null, saisi_par = v_uid, maj_le = now();
   perform set_config('dgs.pointage', 'off', true);
-  return jsonb_build_object('chantier', c.code, 'distance_m', v_distance, 'rayon_m', c.rayon_pointage);
+  return jsonb_build_object('lieu', v_lieu, 'distance_m', v_distance, 'rayon_m', v_rayon);
 end $$;
 
 -- Les RH (ou la direction) contrôlent le selfie : conforme, ou rejeté avec un motif (l'agent est alors absent).

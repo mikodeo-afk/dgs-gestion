@@ -65,7 +65,7 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
       const { data: urls } = await supabase.storage.from("pointages").createSignedUrls(chemins, 900);
       for (const u of urls ?? []) if (u.path && u.signedUrl) liens.set(u.path, u.signedUrl);
     }
-    const { data: chs } = pointes.length ? await supabase.from("chantiers").select("id,code").in("id", pointes.map((p) => p.chantier_id)) : { data: [] };
+    const { data: chs } = pointes.length ? await supabase.from("chantiers").select("id,code").in("id", pointes.map((p) => p.chantier_id).filter(Boolean)) : { data: [] };
     const codes = new Map((chs ?? []).map((c) => [c.id, c.code]));
     const parId = new Map(tous.map((p) => [p.id, p]));
     contenu = (
@@ -115,7 +115,7 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
                               <figure>{ref ? <img src={ref} alt={`Photo de référence de ${a?.nom}`} /> : <span className="vide">Pas de photo de référence</span>}Référence</figure>
                             </div>
                           </td>
-                          <td>{heureFr(p.heure_arrivee)} · {codes.get(p.chantier_id) ?? "—"}<br /><span className="note">à {p.distance_m} m du site{p.precision_m ? ` (GPS ± ${p.precision_m} m)` : ""}</span></td>
+                          <td>{heureFr(p.heure_arrivee)} · {p.chantier_id ? codes.get(p.chantier_id) ?? "Chantier" : "Bureau"}<br /><span className="note">à {p.distance_m} m{p.precision_m ? ` (GPS ± ${p.precision_m} m)` : ""}</span></td>
                           <td>
                             {p.controle === "À contrôler"
                               ? <ControlePointage profilId={p.profil_id} nom={a?.nom ?? ""} jour={jour} />

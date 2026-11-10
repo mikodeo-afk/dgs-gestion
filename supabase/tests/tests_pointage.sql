@@ -13,14 +13,15 @@ select pg_temp.check(round(distance_m(12.6360, -8.0000, 12.6370, -8.0000)) betwe
 
 -- Technicien : pas de pointage tant que la position du chantier n'est pas connue
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000010';
-select pg_temp.check((select count(*) from chantiers_pointage()) = 0, 'aucun chantier proposé sans position GPS');
+select pg_temp.check((select string_agg(code, ',') from chantiers_pointage()) = 'TEL-001', 'le technicien est affecté à son chantier (tâche en cours)');
 select pg_temp.check(pg_temp.erreur($$select pointer('10000000-0000-0000-0000-000000000001', 12.6360, -8.0, 10, 'ML/00000000-0000-0000-0000-000000000010/a.jpg')$$) like '%position du chantier%',
                      'pointer exige la position du chantier');
 commit;
 update chantiers set latitude = 12.6360, longitude = -8.0000, rayon_pointage = 300 where code = 'TEL-001';
 
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000010';
-select pg_temp.check((select string_agg(code, ',') from chantiers_pointage()) = 'TEL-001', 'le technicien voit seulement son chantier pour pointer');
+select pg_temp.check(pg_temp.erreur($$select pointer(null, 12.6361, -8.0, 10, 'ML/00000000-0000-0000-0000-000000000010/a.jpg')$$) like '%affecté à un chantier%',
+                     'affecté à un chantier, il ne pointe pas au bureau');
 select pg_temp.check(pg_temp.erreur($$select pointer('10000000-0000-0000-0000-000000000001', 12.6400, -8.0, 10, 'ML/00000000-0000-0000-0000-000000000010/a.jpg')$$) like '%hors du rayon%',
                      'hors du rayon (445 m pour 300 m), le pointage est refusé');
 select pg_temp.check(pg_temp.erreur($$select pointer('10000000-0000-0000-0000-000000000001', 12.6361, -8.0, 400, 'ML/00000000-0000-0000-0000-000000000010/a.jpg')$$) like '%trop imprécise%',
@@ -29,7 +30,7 @@ select pg_temp.check(pg_temp.erreur($$select pointer('10000000-0000-0000-0000-00
 select pg_temp.check(pg_temp.echoue($$select pointer('10000000-0000-0000-0000-000000000001', 12.6361, -8.0, 10, 'ML/00000000-0000-0000-0000-000000000011/a.jpg')$$),
                      'on ne pointe pas avec le selfie d''un autre');
 select pg_temp.check(pg_temp.echoue($$select pointer('10000000-0000-0000-0000-000000000002', 12.6361, -8.0, 10, 'ML/00000000-0000-0000-0000-000000000010/a.jpg')$$),
-                     'on ne pointe pas sur un chantier qui n''est pas le sien');
+                     'on ne pointe pas sur un chantier où l''on n''est pas affecté');
 select pointer('10000000-0000-0000-0000-000000000001', 12.6370, -8.0, 12, 'ML/00000000-0000-0000-0000-000000000010/selfie.jpg');
 select pg_temp.check((select statut = 'P' and heure_arrivee is not null and distance_m between 110 and 112 and controle = 'À contrôler'
                       and chantier_id = '10000000-0000-0000-0000-000000000001' and precision_m = 12
@@ -69,6 +70,27 @@ select pg_temp.check((select statut = 'P' and controle = 'Conforme' and motif_re
                       from presences where profil_id = '00000000-0000-0000-0000-000000000010' and jour = current_date),
                      'après vérification, le pointage est conforme');
 commit;
+
+-- Bureau : zone par défaut de ceux qui ne sont affectés à aucun chantier (ici le RAF)
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';
+select pg_temp.check((select count(*) from chantiers_pointage()) = 0, 'le RAF n''est affecté à aucun chantier');
+select pg_temp.check(pg_temp.erreur($$select pointer(null, 12.65, -7.99, 10, 'ML/00000000-0000-0000-0000-000000000003/a.jpg')$$) like '%position du bureau%',
+                     'sans position du bureau, pas de pointage au bureau');
+select definir_bureau(12.6500, -7.9900, 200);
+select pg_temp.check(pg_temp.erreur($$select pointer(null, 12.6600, -7.99, 10, 'ML/00000000-0000-0000-0000-000000000003/a.jpg')$$) like '%du bureau, hors du rayon%' or
+                     pg_temp.erreur($$select pointer(null, 12.6600, -7.99, 10, 'ML/00000000-0000-0000-0000-000000000003/a.jpg')$$) like '%le bureau, hors du rayon%',
+                     'loin du bureau, le pointage est refusé');
+select pointer(null, 12.6505, -7.9900, 8, 'ML/00000000-0000-0000-0000-000000000003/selfie.jpg');
+select pg_temp.check((select chantier_id is null and distance_m between 50 and 60 and controle = 'À contrôler'
+                      from presences where profil_id = '00000000-0000-0000-0000-000000000003' and jour = current_date),
+                     'le RAF pointe au bureau');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000006';
+select pg_temp.check(pg_temp.echoue($$select definir_bureau(0, 0, 200)$$), 'un chef de projet ne déplace pas le bureau');
+select pg_temp.check(exists (select 1 from chantiers_pointage() where code = 'TEL-001'), 'le chef de projet pointe sur le chantier qu''il dirige');
+commit;
+select pg_temp.check((select bool_and(exists (select 1 from permissions_poste pp where pp.poste = p and pp.cle = 'pointer')) from unnest(enum_range(null::poste)) p),
+                     'tout le personnel a le droit de pointer');
 
 -- Un jour sans pointage ne se contrôle pas
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000004';
