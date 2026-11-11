@@ -8,16 +8,25 @@ export type Fichier = { id: string; nom_fichier: string; depose_le: string; type
 export const DOCS_ADMIN = ["RCCM", "IFU / NIF", "Statuts", "Pièce d'identité du gérant", "Autre document administratif"];
 export const DOCS_FISCAUX = ["Attestation de régularité fiscale", "Quitus fiscal", "Attestation CNSS / INPS", "Autre document fiscal"];
 const TYPES = "application/pdf,image/jpeg,image/png,image/webp";
+/** Types de documents d'un dossier : groupes proposés, et types qui exigent une date de validité. */
+export type TypesDossier = { groupes: [string, string[]][]; avecValidite: string[] };
+const DOSSIER_SOCIETE: TypesDossier = { groupes: [["Administratif", DOCS_ADMIN], ["Fiscal", DOCS_FISCAUX]], avecValidite: DOCS_FISCAUX };
+export const DOSSIER_MATERIEL: TypesDossier = {
+  groupes: [["Avec date de validité", ["Assurance", "Visite technique", "Vignette / taxe", "Autorisation de transport"]],
+            ["Autres", ["Carte grise", "Facture d'achat", "Notice / garantie", "Photo", "Autre document"]]],
+  avecValidite: ["Assurance", "Visite technique", "Vignette / taxe", "Autorisation de transport"],
+};
 
 /** Documents signés d'une pièce : consultation et dépôt (PDF ou photo, 20 Mo au plus). */
-export default function Justificatifs({ objet, objetId, numero, pays, fichiers, peutDeposer, page, compact, dossier }: {
+export default function Justificatifs({ objet, objetId, numero, pays, fichiers, peutDeposer, page, compact, dossier, types = DOSSIER_SOCIETE }: {
   objet: Objet; objetId: string; numero: string; pays: string; fichiers: Fichier[]; peutDeposer: boolean; page: string; compact?: boolean;
   /** Dossier d'une société : chaque document a un type, et une date de validité s'il est fiscal. */
   dossier?: boolean;
+  types?: TypesDossier;
 }) {
-  const [typeDoc, setTypeDoc] = useState(DOCS_ADMIN[0]);
+  const [typeDoc, setTypeDoc] = useState(types.groupes[0][1][0]);
   const [validite, setValidite] = useState("");
-  const fiscal = DOCS_FISCAUX.includes(typeDoc);
+  const fiscal = types.avecValidite.includes(typeDoc);
   const auj = new Date().toISOString().slice(0, 10);
   const [msg, setMsg] = useState<{ ok?: string; erreur?: string } | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -35,7 +44,7 @@ export default function Justificatifs({ objet, objetId, numero, pays, fichiers, 
     if (!TYPES.split(",").includes(f.type)) return setMsg({ erreur: "Déposez un PDF ou une photo (JPEG, PNG)." });
     if (dossier && fiscal && !validite) {
       if (champ.current) champ.current.value = "";
-      return setMsg({ erreur: "Indiquez d'abord jusqu'à quand ce document fiscal est valable." });
+      return setMsg({ erreur: "Indiquez d'abord jusqu'à quand ce document est valable." });
     }
     setEnCours(true);
     setMsg(null);
@@ -66,8 +75,7 @@ export default function Justificatifs({ objet, objetId, numero, pays, fichiers, 
       {peutDeposer && dossier && (
         <span className="statusline">
           <select aria-label="Type de document" value={typeDoc} onChange={(e) => setTypeDoc(e.target.value)} className="btn sm">
-            <optgroup label="Administratif">{DOCS_ADMIN.map((t) => <option key={t}>{t}</option>)}</optgroup>
-            <optgroup label="Fiscal">{DOCS_FISCAUX.map((t) => <option key={t}>{t}</option>)}</optgroup>
+            {types.groupes.map(([g, l]) => <optgroup key={g} label={g}>{l.map((t) => <option key={t}>{t}</option>)}</optgroup>)}
           </select>
           {fiscal && <label className="note" style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>valable jusqu&apos;au<input type="date" value={validite} onChange={(e) => setValidite(e.target.value)} /></label>}
         </span>

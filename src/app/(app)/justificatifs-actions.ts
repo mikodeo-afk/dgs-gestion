@@ -4,10 +4,10 @@ import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/journal";
 
-export type Objet = "pv" | "bon_commande" | "facture_client" | "facture_fournisseur" | "proforma" | "depense" | "tiers" | "bc_client";
+export type Objet = "pv" | "bon_commande" | "facture_client" | "facture_fournisseur" | "proforma" | "depense" | "tiers" | "bc_client" | "equipement";
 const LIBELLE: Record<Objet, string> = {
   pv: "du PV", bon_commande: "du bon de commande", facture_client: "de la facture", facture_fournisseur: "de la facture fournisseur",
-  proforma: "de la proforma", depense: "de la dépense", tiers: "de la société", bc_client: "(bon de commande du client) du chantier",
+  proforma: "de la proforma", depense: "de la dépense", tiers: "de la société", bc_client: "(bon de commande du client) du chantier", equipement: "du matériel",
 };
 
 /** Enregistre le fichier déposé dans le stockage comme justificatif de la pièce. */

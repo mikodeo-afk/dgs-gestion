@@ -24,6 +24,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     liens.push({ href: "/achats", libelle: "Achats" });
   if (VOIT_TIERS.some((d) => s.peut(d)))
     liens.push({ href: "/tiers", libelle: "Clients et fournisseurs" });
+  liens.push({ href: "/stock", libelle: terrain ? "Mon matériel" : "Stock" });
+  liens.push({ href: "/materiel", libelle: "Matériel" });
   if (s.peut("fin.voir")) liens.push({ href: "/finances", libelle: "Finances" });
   liens.push({ href: "/rh", libelle: terrain ? "Mon espace RH" : "Ressources humaines" });
   liens.push({ href: "/personnel", libelle: terrain ? "Ma fiche" : "Personnel" });
