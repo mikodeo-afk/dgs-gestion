@@ -30,7 +30,8 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 
 ## Mise en service
 
-1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0016`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré, et `0009` que `0008` le soit).
+1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0017`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré, et `0009` que `0008` le soit).
+   Pour la lecture des photos (bordereaux, factures, tableaux de dossiers) : ajouter `ANTHROPIC_API_KEY` dans les variables d'environnement de Vercel.
 2. **Vercel** : importer ce dépôt GitHub, puis renseigner les variables d'environnement (voir `.env.example`) :
    - `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API) ;
    - `SUPABASE_SERVICE_ROLE_KEY` (même page ; clé secrète, uniquement sur le serveur).

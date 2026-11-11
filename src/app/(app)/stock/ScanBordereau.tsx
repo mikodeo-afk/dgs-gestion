@@ -2,20 +2,10 @@
 import { useRef, useState } from "react";
 import { importerStock, type LigneImport } from "./actions";
 import { lireBordereau, type LigneLue } from "./scan-actions";
+import { reduirePhoto } from "@/lib/photo";
 
 type Option = { id: string; libelle: string };
 type Ligne = LigneLue & { garder: boolean };
-
-/** Réduit la photo (bord le plus long ≤ 1600 px, JPEG) pour l'envoi. */
-async function reduire(f: File): Promise<string> {
-  const img = await createImageBitmap(f);
-  const k = Math.min(1, 1600 / Math.max(img.width, img.height));
-  const c = document.createElement("canvas");
-  c.width = Math.round(img.width * k);
-  c.height = Math.round(img.height * k);
-  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL("image/jpeg", 0.85);
-}
 
 export default function ScanBordereau({ endroits, clients }: { endroits: Option[]; clients: Option[] }) {
   const [ou, setOu] = useState("depot");
@@ -32,7 +22,7 @@ export default function ScanBordereau({ endroits, clients }: { endroits: Option[
     setLignes([]);
     setEtape("lecture");
     try {
-      const image = await reduire(f);
+      const image = await reduirePhoto(f);
       setApercu(image);
       const r = await lireBordereau(image);
       if (r.erreur || !r.lecture) { setMsg({ erreur: r.erreur ?? "Lecture impossible." }); return; }

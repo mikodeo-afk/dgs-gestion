@@ -11,6 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const liens = [
     { href: "/", libelle: "Tableau de bord" },
     { href: "/chantiers", libelle: "Chantiers" },
+    { href: "/raccordements", libelle: "Raccordements" },
   ];
   if (s.peut("pointer")) liens.splice(1, 0, { href: "/pointage", libelle: "Je pointe" });
   if (s.peut("tache.maj") || s.peut("tache.creer")) liens.push({ href: "/taches", libelle: terrain ? "Mes tâches" : "Tâches" });
