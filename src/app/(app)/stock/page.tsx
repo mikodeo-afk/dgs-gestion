@@ -4,6 +4,7 @@ import { supabaseServeur } from "@/lib/supabase/server";
 import { dateFr, fcfa, heureFr } from "@/lib/format";
 import { Kpi, Pastille } from "@/components/ui";
 import { FormArticle, FormMouvement, FormUtilisation } from "./Formulaires";
+import ImportExcel from "./ImportExcel";
 
 type Ligne = { article_id: string; code: string; designation: string; categorie: string | null; unite: string; client_id: string | null;
   seuil_alerte: number; lieu_id: string | null; detenteur_id: string | null; quantite: number; cmp: number; valeur: number };
@@ -111,6 +112,10 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
             chantiers={optChantiers}
             bcs={(bcs ?? []).map((b) => ({ id: b.id, libelle: `${b.numero} · ${b.fournisseur} · ${b.objet}` }))}
           />
+          <details style={{ marginTop: 10 }}>
+            <summary>Importer un fichier Excel</summary>
+            <ImportExcel endroits={endroits} />
+          </details>
           <details style={{ marginTop: 10 }}>
             <summary>Nouvel article</summary>
             <FormArticle clients={(clients ?? []).map((c) => ({ id: c.id, libelle: c.nom }))} />

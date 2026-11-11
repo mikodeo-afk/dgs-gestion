@@ -77,3 +77,19 @@ export async function declarerUtilisation(_: Etat, f: FormData): Promise<Etat> {
   revalidatePath("/stock");
   return { ok: "Utilisation enregistrée." };
 }
+
+export type LigneImport = { ligne: number; code: string; designation?: string; unite?: string; categorie?: string; provenance?: string;
+  seuil?: string; quantite?: string; prix?: string; fournisseur?: string; reference?: string };
+
+/** Import d'un fichier Excel : création des articles et entrées (ou inventaire) en une seule fois. */
+export async function importerStock(mode: "entree" | "inventaire", ou: string, lignes: LigneImport[]): Promise<Etat> {
+  await exigerDroit("stock.gerer");
+  const supabase = await supabaseServeur();
+  const e = endroit(ou);
+  const { data, error } = await supabase.rpc("importer_stock", { p_mode: mode, p_lieu: e.lieu, p_detenteur: e.detenteur, p_lignes: lignes });
+  if (error) return { erreur: error.message };
+  const r = data as { lignes: number; articles_crees: number; mouvements: number };
+  await journaliser(`a importé un fichier Excel de stock (${mode === "entree" ? "entrées" : "inventaire"} : ${r.lignes} lignes, ${r.articles_crees} articles créés, ${r.mouvements} mouvements)`);
+  revalidatePath("/stock");
+  return { ok: `Import terminé : ${r.lignes} lignes lues, ${r.articles_crees} article(s) créé(s), ${r.mouvements} mouvement(s) enregistré(s).` };
+}

@@ -113,3 +113,23 @@ select affecter_equipement('70000000-0000-0000-0000-000000000002', null, null, '
 select pg_temp.check(pg_temp.echoue($$select affecter_equipement('70000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', null, null)$$), 'un matériel réformé ne s''affecte plus');
 commit;
 \echo 'Tous les tests de la logistique passent.'
+
+-- Import Excel
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000021';
+insert into tiers (type, nom) values ('client', 'Opérateur Télécom');
+select pg_temp.check((importer_stock('entree', null, null, '[
+  {"ligne":2,"code":"drop-2fo","designation":"Câble drop 2 FO","unite":"m","provenance":"DGS","quantite":"1000","prix":"150","fournisseur":"Fibre SA"},
+  {"ligne":3,"code":"CIM-50","quantite":"10","prix":"6000"},
+  {"ligne":4,"code":"PTO","designation":"Prise terminale optique","unite":"pièce","provenance":"opérateur télécom","seuil":"20"}
+]'::jsonb) ->> 'articles_crees')::int = 2, 'import : deux articles créés');
+select pg_temp.check(quantite_en_stock((select id from articles where code = 'DROP-2FO'), null) = 1000, 'import : 1 000 m de câble entrés au dépôt');
+select pg_temp.check((select client_id is not null and seuil_alerte = 20 from articles where code = 'PTO'), 'import : provenance client et seuil repris');
+select pg_temp.check(pg_temp.erreur($$select importer_stock('entree', null, null, '[{"ligne":2,"code":"CIM-50","quantite":"5"},{"ligne":3,"code":"NOUVEAU","quantite":"5"}]'::jsonb)$$) like 'Ligne 3 :%',
+                     'import : la ligne en erreur est signalée');
+select pg_temp.check(quantite_en_stock('60000000-0000-0000-0000-000000000001', null) = 15, 'import en erreur : rien n''est enregistré');
+select importer_stock('inventaire', null, '00000000-0000-0000-0000-000000000010', '[{"ligne":2,"code":"ONT-CL","quantite":"2"}]'::jsonb);
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000006';
+select pg_temp.check(pg_temp.echoue($$select importer_stock('entree', null, null, '[{"ligne":2,"code":"CIM-50","quantite":"5"}]'::jsonb)$$), 'import réservé au gestionnaire du stock');
+commit;
+\echo 'Import Excel : OK.'
