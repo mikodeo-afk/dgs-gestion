@@ -23,6 +23,7 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
   const supabase = await supabaseServeur();
   const aujourdhui = new Date().toISOString().slice(0, 10);
   const debutMois = aujourdhui.slice(0, 8) + "01";
+  const jours = (d: string) => Math.max(0, Math.round((Date.parse(aujourdhui) - Date.parse(d.slice(0, 10))) / 86400000));
 
   const statuts = onglet === "realises" ? ["Réalisé"] : onglet === "echecs" ? ["Échec"] : ["À affecter", "Affecté"];
   const [{ data: equipes }, { data: membres }, { data: mes }, { data: profils }, { data: chantiers }, { data: dossiers }, { data: compte }, { data: attente }] = await Promise.all([
@@ -32,9 +33,9 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
     supabase.from("profils").select("id,nom,actif").order("nom"),
     supabase.from("chantiers").select("id,code,nom,statut,domaine").order("code"),
     onglet === "equipes" ? Promise.resolve({ data: [] }) : supabase.from("raccordements")
-      .select("id,client,ligne,mobile,msan,offre,latitude,longitude,date_demande,date_limite,statut,equipe_id,realise_le,motif_echec")
-      .in("statut", statuts).order(onglet === "en-cours" ? "date_limite" : "realise_le", { ascending: onglet === "en-cours", nullsFirst: false }).limit(500),
-    supabase.from("raccordements").select("statut,realise_le,date_limite"),
+      .select("id,client,ligne,mobile,msan,offre,latitude,longitude,date_demande,date_affectation,statut,equipe_id,realise_le,motif_echec")
+      .in("statut", statuts).order(onglet === "en-cours" ? "date_affectation" : "realise_le", { ascending: onglet === "en-cours", nullsFirst: false }).limit(500),
+    supabase.from("raccordements").select("statut,realise_le,date_affectation"),
     stock || gere ? supabase.from("consommations_raccordement").select("id,raccordement_id,rubrique,quantite,statut,note,article_id,cree_le").in("statut", ["À régulariser", "Non relié"]).order("cree_le").limit(300) : Promise.resolve({ data: [] }),
   ]);
 
@@ -58,13 +59,13 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
   const libRub = (k: string) => { const [b, t] = k.split(":"); return `${RUBRIQUES.find((r) => r.cle === b)?.libelle ?? b}${t ? ` ${t}` : ""}`; };
   const lignes: LigneDossier[] = (dossiers ?? []).map((d) => ({
     ...d, equipe: d.equipe_id ? nomEquipe.get(d.equipe_id) ?? null : null,
-    retard: (d.statut === "À affecter" || d.statut === "Affecté") && !!d.date_limite && d.date_limite < aujourdhui,
+    attente: (d.statut === "À affecter" || d.statut === "Affecté") && d.date_affectation ? jours(d.date_affectation) : null,
     materiel: (consos ?? []).filter((c) => c.raccordement_id === d.id)
       .map((c) => `${libRub(c.rubrique)} ${Number(c.quantite)}${c.statut === "À régulariser" ? " ⚠" : c.statut === "Non relié" ? " (non suivi)" : ""}`).join(" · "),
   }));
 
   const tous = compte ?? [];
-  const nb = (f: (r: { statut: string; realise_le: string | null; date_limite: string | null }) => boolean) => tous.filter(f).length;
+  const nb = (f: (r: { statut: string; realise_le: string | null; date_affectation: string | null }) => boolean) => tous.filter(f).length;
   const aRegulariser = ((attente ?? []) as Conso[]).filter((c) => c.statut === "À régulariser");
   const nonRelies = ((attente ?? []) as Conso[]).filter((c) => c.statut === "Non relié");
 
@@ -88,8 +89,8 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
       <div className="kpis">
         <Kpi libelle="À affecter" valeur={nb((r) => r.statut === "À affecter")} ton={nb((r) => r.statut === "À affecter") ? "hl" : undefined} />
         <Kpi libelle="En cours chez les équipes" valeur={nb((r) => r.statut === "Affecté")} />
-        <Kpi libelle="En retard" valeur={nb((r) => (r.statut === "À affecter" || r.statut === "Affecté") && !!r.date_limite && r.date_limite < aujourdhui)}
-          ton={nb((r) => (r.statut === "À affecter" || r.statut === "Affecté") && !!r.date_limite && r.date_limite < aujourdhui) ? "neg" : undefined} />
+        <Kpi libelle="En attente depuis plus de 2 jours" valeur={nb((r) => (r.statut === "À affecter" || r.statut === "Affecté") && !!r.date_affectation && jours(r.date_affectation) > 2)}
+          ton={nb((r) => (r.statut === "À affecter" || r.statut === "Affecté") && !!r.date_affectation && jours(r.date_affectation) > 2) ? "neg" : undefined} />
         <Kpi libelle="Réalisés ce mois" valeur={nb((r) => r.statut === "Réalisé" && (r.realise_le ?? "") >= debutMois)} ton="pos" />
       </div>
 
