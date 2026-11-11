@@ -15,8 +15,8 @@ insert into equipes (id, nom, chef_id, chantier_id) values
   ('80000000-0000-0000-0000-000000000001', 'Équipe Eugène', '00000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001');
 insert into equipe_membres values ('80000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011');
 select pg_temp.check((importer_dossiers('10000000-0000-0000-0000-000000000001', '[
-  {"client":"BOKO HOSSOU","ligne":"121383143","mobile":"147332343","msan":"AKP-PL72 FAT293","latitude":"6.38020658913341","longitude":"2.46653753160029","date_demande":"2025-11-08","date_limite":"2025-11-10","offre":"FTTH_PRO_25M"},
-  {"client":"SOULE MONLOTO AICHATOU","ligne":"121328435","mobile":"166741286","msan":"GOD-PL126 FAT091","date_demande":"2025-11-06","date_limite":"2025-11-08","offre":"FTTH_Home_20M"}
+  {"client":"BOKO HOSSOU","ligne":"121383143","mobile":"147332343","msan":"AKP-PL72 FAT293","latitude":"6.38020658913341","longitude":"2.46653753160029","date_demande":"2025-11-08","date_affectation":"2025-11-10","offre":"FTTH_PRO_25M"},
+  {"client":"SOULE MONLOTO AICHATOU","ligne":"121328435","mobile":"166741286","msan":"GOD-PL126 FAT091","date_demande":"2025-11-06","date_affectation":"2025-11-08","offre":"FTTH_Home_20M"}
 ]'::jsonb) ->> 'crees')::int = 2, 'import de deux dossiers');
 select pg_temp.check((importer_dossiers('10000000-0000-0000-0000-000000000001', '[{"client":"BOKO HOSSOU","ligne":"0121383143"}]'::jsonb) ->> 'doublons')::int = 1,
                      'un dossier déjà ouvert pour la même ligne est ignoré');
@@ -80,3 +80,4 @@ select rouvrir_raccordement((select id from raccordements where ligne = '1213284
 select pg_temp.check((select statut = 'Affecté' from raccordements where ligne = '121328435'), 'le manager rouvre un dossier en échec');
 commit;
 \echo 'Tous les tests des raccordements passent.'
+select pg_temp.check((select date_affectation = '2025-11-10' from raccordements where ligne = '121383143'), 'la seconde date est la date d''affectation');
