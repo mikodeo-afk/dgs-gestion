@@ -21,6 +21,13 @@ export async function creerEquipement(_: Etat, f: FormData): Promise<Etat> {
     compteur: num(f, "compteur"), unite_compteur: txt(f, "unite_compteur") === "h" ? "h" : "km",
   }).select("id").single();
   if (error) return { erreur: error.code === "23505" ? "Ce numéro d'inventaire ou cette immatriculation existe déjà." : error.message };
+  if (txt(f, "chantier_id") || txt(f, "responsable_id")) {
+    const { error: e2 } = await supabase.rpc("affecter_equipement", {
+      p_id: data.id, p_chantier: txt(f, "chantier_id") || null, p_responsable: txt(f, "responsable_id") || null,
+      p_etat: null, p_compteur: null, p_motif: "Affectation à l'enregistrement",
+    });
+    if (e2) return { erreur: `Matériel enregistré, mais l'affectation a échoué : ${e2.message}` };
+  }
   await journaliser(`a enregistré le matériel ${txt(f, "code").toUpperCase()} « ${txt(f, "designation")} »`);
   redirect(`/materiel/${data.id}`);
 }

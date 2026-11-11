@@ -18,7 +18,7 @@ function Retour({ etat }: { etat: Etat }) {
 const TYPES_ROULANT = ["Pick-up", "Véhicule de liaison", "Camion", "Camion-grue", "Nacelle", "Moto", "Engin de terrassement", "Remorque"];
 const TYPES_TRAVAIL = ["Groupe électrogène", "Soudeuse fibre", "Réflectomètre (OTDR)", "Bétonnière", "Compresseur", "Échafaudage", "Outillage électroportatif", "Appareil de mesure", "EPI"];
 
-export function FormEquipement({ categorie }: { categorie: string }) {
+export function FormEquipement({ categorie, chantiers, personnel }: { categorie: string; chantiers: Option[]; personnel: Option[] }) {
   const [etat, action, enCours] = useActionState(creerEquipement, null);
   const roulant = categorie === "Matériel roulant";
   return (
@@ -38,6 +38,18 @@ export function FormEquipement({ categorie }: { categorie: string }) {
       <label>Compteur actuel<input name="compteur" type="number" min="0" /></label>
       <label>Unité du compteur
         <select name="unite_compteur" defaultValue={roulant ? "km" : "h"}><option value="km">km</option><option value="h">heures</option></select>
+      </label>
+      <label>Où
+        <select name="chantier_id" defaultValue="">
+          <option value="">Dépôt / bureau</option>
+          {chantiers.map((c) => <option key={c.id} value={c.id}>{c.libelle}</option>)}
+        </select>
+      </label>
+      <label>{roulant ? "Affecté à (conducteur / responsable)" : "Affecté à (responsable)"}
+        <select name="responsable_id" defaultValue="">
+          <option value="">— Personne —</option>
+          {personnel.map((p) => <option key={p.id} value={p.id}>{p.libelle}</option>)}
+        </select>
       </label>
       <button className="btn pri" type="submit" disabled={enCours}>Enregistrer</button>
       <Retour etat={etat} />

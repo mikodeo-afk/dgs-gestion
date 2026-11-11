@@ -15,8 +15,8 @@ export default async function Materiel({ searchParams }: { searchParams: Promise
   const supabase = await supabaseServeur();
   const [{ data }, { data: chs }, { data: profils }, { data: alertes }] = await Promise.all([
     supabase.from("equipements").select("*").eq("categorie", CATEGORIES[cat]).order("code"),
-    supabase.from("chantiers").select("id,code"),
-    supabase.from("profils").select("id,nom"),
+    supabase.from("chantiers").select("id,code,nom,statut").order("code"),
+    supabase.from("profils").select("id,nom,actif").order("nom"),
     supabase.rpc("alertes_logistique"),
   ]);
   const liste = (data ?? []) as Equipement[];
@@ -62,7 +62,9 @@ export default async function Materiel({ searchParams }: { searchParams: Promise
       {s.peut("mat.gerer") && (
         <details className="panel">
           <summary><b>Enregistrer un {cat === "roulant" ? "véhicule ou engin" : "matériel"}</b></summary>
-          <FormEquipement categorie={CATEGORIES[cat]} />
+          <FormEquipement key={cat} categorie={CATEGORIES[cat]}
+            chantiers={(chs ?? []).filter((c) => c.statut !== "Terminé").map((c) => ({ id: c.id, libelle: `${c.code} · ${c.nom}` }))}
+            personnel={(profils ?? []).filter((p) => p.actif).map((p) => ({ id: p.id, libelle: p.nom }))} />
         </details>
       )}
       <section className="panel">
