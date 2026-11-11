@@ -97,3 +97,12 @@ begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0
 select pg_temp.check(pg_temp.echoue($$select controler_pointage('00000000-0000-0000-0000-000000000010', current_date - 400, true)$$), 'pas de contrôle sans pointage');
 commit;
 \echo 'Tous les tests du pointage par téléphone passent.'
+
+-- Accès groupe : la RH du Bénin enregistre la photo de référence du PDG (compte créé au Mali)
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000042';
+select definir_photo_reference('00000000-0000-0000-0000-000000000001', 'BJ/reference/00000000-0000-0000-0000-000000000001-1.jpg');
+select pg_temp.check(pg_temp.echoue($$select definir_photo_reference('00000000-0000-0000-0000-000000000010', 'BJ/reference/00000000-0000-0000-0000-000000000010-1.jpg')$$),
+                     'mais pas celle d''un technicien du Mali');
+commit;
+select pg_temp.check((select photo_reference like 'BJ/reference/%' from profils where id = '00000000-0000-0000-0000-000000000001'),
+                     'photo de référence d''une personne à accès groupe enregistrée depuis le Bénin');
