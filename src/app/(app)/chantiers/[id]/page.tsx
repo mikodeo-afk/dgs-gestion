@@ -53,6 +53,8 @@ export default async function FicheChantier({ params }: { params: Promise<{ id: 
   const agents = (profils ?? []).filter((p) => ["ce", "tech"].includes(p.poste));
   const liste = (taches ?? []) as Tache[];
 
+  const { data: conso } = await supabase.rpc("consommation_chantier", { p_chantier: id });
+  const materielUtilise = (conso ?? []) as { article_id: string; code: string; designation: string; unite: string; client_id: string | null; quantite: number; valeur: number }[];
   return (
     <>
       <div className="head">
@@ -179,6 +181,26 @@ export default async function FicheChantier({ params }: { params: Promise<{ id: 
           </table>
         </div>
       </section>
+      {materielUtilise.length > 0 && (
+        <section className="panel">
+          <h2>Matériel utilisé</h2>
+          <p className="note">Quantités déclarées utilisées sur ce chantier (stock). Le matériel fourni par le client n&apos;a pas de valeur pour DGS.</p>
+          <div className="tbl">
+            <table>
+              <thead><tr><th>Article</th><th className="num">Quantité</th><th className="num">Valeur (CMP)</th></tr></thead>
+              <tbody>
+                {materielUtilise.map((m) => (
+                  <tr key={m.article_id}>
+                    <td><span className="code">{m.code}</span> {m.designation}{m.client_id && <span className="note"> · fourni par le client</span>}</td>
+                    <td className="num">{Number(m.quantite).toLocaleString("fr-FR")} {m.unite}</td>
+                    <td className="num">{m.client_id ? "—" : fcfa(m.valeur)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </>
   );
 }
