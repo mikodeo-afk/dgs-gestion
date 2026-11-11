@@ -46,7 +46,7 @@ export async function lireBordereau(image: string): Promise<{ lecture?: LectureB
   try {
     const client = new Anthropic();
     const rep = await client.messages.parse({
-      model: "claude-opus-5-5",
+      model: "claude-haiku-5-5",
       max_tokens: 16000,
       output_config: { effort: "low", format: zodOutputFormat(Lecture) },
       system: CONSIGNE,
