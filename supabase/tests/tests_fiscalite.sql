@@ -42,4 +42,25 @@ begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0
 select pg_temp.check((select count(*) from declarations_fiscales) = 0, 'le Mali ne voit pas les déclarations du Bénin');
 commit;
 
+
+-- États financiers : clôture d'exercice
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000040';
+select pg_temp.check((donnees_cloture(2026) ->> 'stock_fin') is not null, 'le RAF lit les données d''inventaire');
+insert into clotures_exercice (annee, saisies) values (2026, '{"capital": 10000000}');
+select pg_temp.check((select pays from clotures_exercice where annee = 2026) = 'BJ', 'la clôture appartient au Bénin');
+select pg_temp.check(pg_temp.echoue($$update clotures_exercice set statut = 'Arrêté' where annee = 2026$$), 'pas d''arrêté sans états calculés');
+update clotures_exercice set etats = '{"actif":[]}', statut = 'Arrêté' where annee = 2026;
+select pg_temp.check((select arrete_le is not null from clotures_exercice where annee = 2026), 'l''arrêté est daté');
+select pg_temp.check(pg_temp.echoue($$update clotures_exercice set saisies = '{}' where annee = 2026$$), 'des états arrêtés ne se modifient pas');
+update clotures_exercice set statut = 'Brouillon' where annee = 2026;
+update clotures_exercice set saisies = '{"capital": 12000000}' where annee = 2026;
+select pg_temp.check((select (saisies ->> 'capital')::int from clotures_exercice where annee = 2026) = 12000000, 'rouverts, ils se modifient');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000043';
+select pg_temp.check(pg_temp.echoue($$select donnees_cloture(2026)$$), 'le technicien ne lit pas les données d''inventaire');
+select pg_temp.check((select count(*) from clotures_exercice) = 0, 'ni les clôtures');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';
+select pg_temp.check((select count(*) from clotures_exercice) = 0, 'le Mali ne voit pas la clôture du Bénin');
+commit;
 \echo Tous les tests de l agent comptable fiscal passent.

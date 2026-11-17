@@ -52,6 +52,7 @@ export default async function Fiscalite({ searchParams }: { searchParams: Promis
             salariés déclarés et paie enregistrés dans l&apos;application, selon le CGI 2026 et la loi de finances 2026 du Bénin.
           </p>
         </div>
+        <Link className="btn pri" href="/fiscalite/etats">États financiers annuels</Link>
       </div>
 
       <div className="kpis">
@@ -116,6 +117,7 @@ export default async function Fiscalite({ searchParams }: { searchParams: Promis
               </ul>
             )}
             <p className="note">{o.comment} <i>{o.base}</i></p>
+            {o.code === "DSF" && <p><Link className="btn sm" href={`/fiscalite/etats?annee=${o.periode}`}>Préparer les états financiers {o.periode}</Link></p>}
             {o.enregistree ? (
               <div className="statusline">
                 <span className="note">
