@@ -28,6 +28,10 @@ export default function FormEmploye({ responsables, postes }: { responsables: { 
       <label>Date d&apos;embauche<input id="e-emb" name="date_embauche" type="date" /></label>
       <label>Fin de contrat<input id="e-fin" name="date_fin" type="date" /></label>
       <label>Salaire mensuel (FCFA)<input id="e-sal" name="salaire" type="number" min="0" step="1000" /></label>
+      <label>N° CNSS<input id="e-cnss" name="numero_cnss" /></label>
+      <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <input id="e-decl" name="declare_cnss" type="checkbox" value="1" defaultChecked /> Déclaré (CNSS et impôts)
+      </label>
       <button className="btn pri" type="submit" disabled={enCours}>{enCours ? "Création…" : "Créer le compte"}</button>
       {etat?.erreur && <p className="erreur" style={{ gridColumn: "1/-1" }}>{etat.erreur}</p>}
       {etat?.ok && <p className="succes" style={{ gridColumn: "1/-1" }}>{etat.ok}</p>}

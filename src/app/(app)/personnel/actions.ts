@@ -30,7 +30,10 @@ export async function creerEmploye(_: unknown, f: FormData) {
     date_embauche: txt(f, "date_embauche") || undefined, date_fin: txt(f, "date_fin") || null,
   }).eq("id", id);
   if (e2) return { erreur: "Compte créé mais fiche incomplète : " + e2.message };
-  await admin.from("remunerations").upsert({ profil_id: id, salaire_base: Number(txt(f, "salaire")) || 0 });
+  await admin.from("remunerations").upsert({
+    profil_id: id, salaire_base: Number(txt(f, "salaire")) || 0,
+    declare_cnss: txt(f, "declare_cnss") === "1", numero_cnss: txt(f, "numero_cnss") || null,
+  });
   await journaliser(`a ajouté ${txt(f, "nom")} (${POSTES[poste].nom}) au personnel`);
   revalidatePath("/personnel");
   return { ok: `Compte créé pour ${txt(f, "nom")}. Communiquez-lui son e-mail et son mot de passe provisoire.` };
@@ -45,7 +48,13 @@ export async function modifierEmploye(f: FormData) {
     contrat: txt(f, "contrat"), date_fin: txt(f, "date_fin") || null,
   }).eq("id", id);
   if (error) throw new Error(error.message);
-  if (f.has("salaire")) await supabase.from("remunerations").upsert({ profil_id: id, salaire_base: Number(txt(f, "salaire")) || 0 });
+  if (f.has("salaire")) {
+    const { error: e2 } = await supabase.from("remunerations").upsert({
+      profil_id: id, salaire_base: Number(txt(f, "salaire")) || 0,
+      declare_cnss: txt(f, "declare_cnss") === "1", numero_cnss: txt(f, "numero_cnss") || null,
+    });
+    if (e2) throw new Error(e2.message);
+  }
   revalidatePath("/personnel");
 }
 

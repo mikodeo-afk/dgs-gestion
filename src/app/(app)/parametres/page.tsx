@@ -7,13 +7,19 @@ import FormIdentite from "./FormIdentite";
 import FormBureau from "./FormBureau";
 import type { Identite } from "@/lib/types";
 
-const ORDRE = ["tva", "aib", "seuil_validation", "inps_salarie", "jours_ouvres_mois", "precision_gps_max"];
+const ORDRE = ["tva", "aib", "seuil_validation", "inps_salarie", "jours_ouvres_mois", "precision_gps_max",
+  "vps", "cnss_patronal", "cnss_risque_pro", "cnss_mensuelle", "is_taux", "is_minimum", "is_annee_precedente", "patente_annuelle"];
 const NOM: Record<string, string> = {
   tva: "TVA", aib: "AIB par défaut", seuil_validation: "Seuil de validation",
   inps_salarie: "Retenue sociale salariale", jours_ouvres_mois: "Jours ouvrés par mois",
   precision_gps_max: "Précision GPS du pointage",
+  vps: "VPS (versement patronal)", cnss_patronal: "CNSS employeur", cnss_risque_pro: "CNSS risques professionnels",
+  cnss_mensuelle: "CNSS chaque mois", is_taux: "Impôt sur les sociétés", is_minimum: "Minimum d'IS",
+  is_annee_precedente: "IS de l'année précédente", patente_annuelle: "Patente de l'année",
 };
-const unite = (cle: string) => (cle === "seuil_validation" ? "FCFA" : cle === "jours_ouvres_mois" ? "jours" : cle === "precision_gps_max" ? "m" : "%");
+const unite = (cle: string) =>
+  ["seuil_validation", "is_annee_precedente", "patente_annuelle"].includes(cle) ? "FCFA"
+  : cle === "jours_ouvres_mois" ? "jours" : cle === "precision_gps_max" ? "m" : cle === "cnss_mensuelle" ? "(1 = oui, 0 = trimestre)" : "%";
 
 export default async function Parametres() {
   const s = await exigerSession();
