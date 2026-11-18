@@ -23,7 +23,7 @@ export default function FormEmploye({ responsables, postes }: { responsables: { 
       </label>
       <label>Téléphone<input id="e-tel" name="telephone" placeholder="+223 …" /></label>
       <label>Contrat
-        <select id="e-contrat" name="contrat"><option>CDD</option><option>CDI</option><option>Stage</option><option>Journalier</option></select>
+        <select id="e-contrat" name="contrat"><option>CDD</option><option>CDI</option><option>Stage</option><option>Journalier</option><option>Prestation</option></select>
       </label>
       <label>Date d&apos;embauche<input id="e-emb" name="date_embauche" type="date" /></label>
       <label>Fin de contrat<input id="e-fin" name="date_fin" type="date" /></label>

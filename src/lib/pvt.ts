@@ -15,6 +15,7 @@ export type Versement = { id: string; mois: string; vendeur_id: string; type: "A
 export type Mois = {
   mois: string; extraction_recue_le: string | null; facture_numero: string | null; facture_ht: number | null; facture_envoyee_le: string | null;
   payee_le: string | null; montant_paye: number | null; ajustement: number; ajustement_motif: string | null; note: string | null; cloture: boolean;
+  definitive_le?: string | null; pv_b2c_id?: string | null; pv_b2b_id?: string | null;
 };
 
 type Palier = [min: number, valeur: number];
@@ -64,8 +65,9 @@ export function echeances(mois: string, m: Mois | undefined) {
     { libelle: "Avance aux vendeurs (sur leur réalisé)", du: av.debut, au: av.fin, fait: null as string | null },
     { libelle: "État mensuel des commandes à SBIN (art. 11)", du: null, au: jour(s, 10), fait: null },
     { libelle: "Extraction SBIN des ventes validées (art. 9.2)", du: null, au: jour(s, 15), fait: m?.extraction_recue_le ?? null },
-    { libelle: "Facture des commissions à SBIN", du: null, au: null, fait: facture ?? null },
-    { libelle: "Paiement SBIN (15 jours après la facture)", du: null, au: facture ? new Date(Date.parse(facture) + 15 * 86400000).toISOString().slice(0, 10) : null, fait: m?.payee_le ?? null },
+    { libelle: "Extraction définitive enregistrée (PV de réception)", du: null, au: null, fait: m?.definitive_le ?? null },
+    { libelle: "Facture des commissions à SBIN (Finances)", du: null, au: null, fait: facture ?? null },
+    { libelle: "Encaissement du paiement SBIN (15 jours après la facture)", du: null, au: facture ? new Date(Date.parse(facture) + 15 * 86400000).toISOString().slice(0, 10) : null, fait: m?.payee_le ?? null },
   ];
 }
 
@@ -107,12 +109,18 @@ export type LigneVendeur = {
   vendeur: Vendeur; declarees: number; validees: number; rejetees: number;
   partDeclaree: number; partValidee: number; vtm: number; vtb: number; transport: number; bonusRetention: number; reportees: number;
   avanceCalculee: number; avancesVersees: number; soldesVerses: number; du: number; avanceHorsFenetre: boolean;
+  previsionnel: boolean;
 };
+export type Previsionnel = { vendeur_id: string; ventes: number; part: number; taux: number; avance: number };
 
-/** Ce qui revient à chaque vendeur pour un mois, et ce qu'on lui a déjà versé. */
-export function parVendeur(mois: string, vendeurs: Vendeur[], ventes: Vente[], offres: Map<string, Offre>, versements: Versement[], tauxAvance: number): LigneVendeur[] {
+/**
+ * Ce qui revient à chaque vendeur pour un mois, et ce qu'on lui a déjà versé.
+ * À partir du 1er du mois suivant, l'avance vient du prévisionnel figé (ventes déclarées à cette date).
+ */
+export function parVendeur(mois: string, vendeurs: Vendeur[], ventes: Vente[], offres: Map<string, Offre>, versements: Versement[], tauxAvance: number, previsionnel: Previsionnel[] = []): LigneVendeur[] {
   const fen = fenetreAvance(mois);
   const ret = retention(mois, ventes, offres);
+  const fige = previsionnel.length > 0;
   return vendeurs.map((v) => {
     const siennes = ventes.filter((x) => x.vendeur_id === v.id && x.mois === mois);
     const ouvertes = siennes.filter((x) => x.statut !== "Rejetée");
@@ -129,11 +137,13 @@ export function parVendeur(mois: string, vendeurs: Vendeur[], ventes: Vente[], o
     const avancesVersees = avances.reduce((a, x) => a + Number(x.montant), 0);
     const soldesVerses = vers.filter((x) => x.type === "Solde").reduce((a, x) => a + Number(x.montant), 0);
     const partValidee = part(valid);
+    const prev = previsionnel.find((p) => p.vendeur_id === v.id);
     const bonusRetention = ret.filter((r) => r.vendeurId === v.id).reduce((a, r) => a + r.bonusVendeur, 0);
     return {
       vendeur: v, declarees: ouvertes.length, validees: valid.length, rejetees: siennes.length - ouvertes.length,
-      partDeclaree: part(ouvertes), partValidee, vtm, vtb, transport, bonusRetention, reportees,
-      avanceCalculee: Math.round((part(ouvertes) * tauxAvance) / 100),
+      partDeclaree: prev ? Number(prev.part) : part(ouvertes), partValidee, vtm, vtb, transport, bonusRetention, reportees,
+      avanceCalculee: prev ? Number(prev.avance) : fige ? 0 : Math.round((part(ouvertes) * tauxAvance) / 100),
+      previsionnel: Boolean(prev),
       avancesVersees, soldesVerses,
       du: partValidee + vtm + vtb + transport + bonusRetention - avancesVersees - soldesVerses,
       avanceHorsFenetre: avances.some((x) => x.verse_le < fen.debut || x.verse_le > fen.fin),
@@ -185,6 +195,35 @@ export function factureSbin(mois: string, ventes: Vente[], offres: Map<string, O
     ajustement: aj, ht, tva: montantTva, ttc: ht + montantTva,
     margeDgs: somme("partPartenaire") + somme("performance") + somme("objectif") + somme("retentionPartenaire") + aj,
   };
+}
+
+// --- PV de réception (extraction SBIN définitive) ---------------------------------------
+export type LignePv = { segment: "B2C" | "B2B"; designation: string; unite: string; quantite: number; prix: number };
+
+/** Lignes des PV de réception du mois, un PV par segment (FTTH / FTTO…), d'après la facture calculée. */
+export function lignesPv(mois: string, ventes: Vente[], offres: Map<string, Offre>, vendeurs: Vendeur[], debutContrat: string, ajustement: number): LignePv[] {
+  const fac = factureSbin(mois, ventes, offres, vendeurs, debutContrat, ajustement, 0);
+  const res: LignePv[] = [];
+  for (const seg of ["B2C", "B2B"] as const) {
+    const f = seg === "B2C" ? fac.b2c : fac.b2b;
+    const parOffre = new Map<string, number>();
+    for (const v of ventes) {
+      if (v.mois !== mois || v.statut !== "Validée" || offres.get(v.offre_id)?.segment !== seg) continue;
+      parOffre.set(v.offre_id, (parOffre.get(v.offre_id) ?? 0) + 1);
+    }
+    for (const [id, n] of parOffre) {
+      const o = offres.get(id)!;
+      res.push({ segment: seg, designation: `Commission ${o.libelle} (${o.code})`, unite: "vente", quantite: n, prix: Number(o.commission) });
+    }
+    if (f.performance) res.push({ segment: seg, designation: `Prime PVT par vente (${f.nPerf} ventes)`, unite: "vente", quantite: f.nPerf, prix: Math.round(f.performance / f.nPerf) });
+    if (f.primesVendeurs) res.push({ segment: seg, designation: seg === "B2C" ? "Primes vendeurs VTM" : "Primes vendeurs VTB", unite: "forfait", quantite: 1, prix: f.primesVendeurs });
+    if (f.objectif) res.push({ segment: seg, designation: "Prime d'objectif (contrat PVT, annexe 3)", unite: "forfait", quantite: 1, prix: f.objectif });
+    if (f.transport) res.push({ segment: seg, designation: "Primes de transport vendeurs", unite: "forfait", quantite: 1, prix: f.transport });
+    if (f.retentionVendeurs) res.push({ segment: seg, designation: "Rétention : bonus vendeurs", unite: "forfait", quantite: 1, prix: f.retentionVendeurs });
+    if (f.retentionPartenaire) res.push({ segment: seg, designation: f.retentionPartenaire > 0 ? "Rétention : bonus partenaire" : "Rétention : malus partenaire", unite: "forfait", quantite: 1, prix: f.retentionPartenaire });
+  }
+  if (ajustement) res.push({ segment: fac.b2c.nombre || !fac.b2b.nombre ? "B2C" : "B2B", designation: "Ajustement", unite: "forfait", quantite: 1, prix: ajustement });
+  return res;
 }
 
 // --- Lecture de l'extraction SBIN (Excel) ----------------------------------------

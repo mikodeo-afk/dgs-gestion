@@ -115,7 +115,7 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
                               <figure>{ref ? <img src={ref} alt={`Photo de référence de ${a?.nom}`} /> : <span className="vide">Pas de photo de référence</span>}Référence</figure>
                             </div>
                           </td>
-                          <td>{heureFr(p.heure_arrivee)} · {p.chantier_id ? codes.get(p.chantier_id) ?? "Chantier" : "Bureau"}<br /><span className="note">à {p.distance_m} m{p.precision_m ? ` (GPS ± ${p.precision_m} m)` : ""}</span></td>
+                          <td>{heureFr(p.heure_arrivee)} · {p.terrain ? "Terrain" : p.chantier_id ? codes.get(p.chantier_id) ?? "Chantier" : "Bureau"}<br /><span className="note">{p.terrain ? (p.latitude != null ? <a href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`} target="_blank" rel="noopener">voir la position</a> : "position enregistrée") : `à ${p.distance_m} m`}{p.precision_m ? ` (GPS ± ${p.precision_m} m)` : ""}</span></td>
                           <td>
                             {p.controle === "À contrôler"
                               ? <ControlePointage profilId={p.profil_id} nom={a?.nom ?? ""} jour={jour} />
@@ -285,7 +285,7 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
                     <td>{u.contrat}</td>
                     <td className="num">{dateFr(u.date_embauche)}</td>
                     <td className="num">{dateFr(u.date_fin)}{bientot.includes(u) && <><br /><Pastille texte="Fin dans moins de 60 j" ton="warn" /></>}</td>
-                    <td className="num">{u.contrat === "Mandataire" ? "—" : `${(moisDepuis(u.date_embauche) * 2.5).toFixed(1).replace(".", ",")} j`}</td>
+                    <td className="num">{["Mandataire", "Prestation"].includes(u.contrat) ? "—" : `${(moisDepuis(u.date_embauche) * 2.5).toFixed(1).replace(".", ",")} j`}</td>
                   </tr>
                 ))}
               </tbody>

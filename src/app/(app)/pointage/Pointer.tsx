@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { supabaseNavigateur } from "@/lib/supabase/navigateur";
 import { pointer } from "./actions";
 
-/** Lieu de pointage : un chantier d'affectation, ou le bureau (id vide). */
-export type Lieu = { id: string | null; code: string; nom: string; latitude: number; longitude: number; rayon_pointage: number };
+/** Lieu de pointage : un chantier d'affectation, le bureau (id vide), ou le terrain (id vide, sans rayon). */
+export type Lieu = { id: string | null; code: string; nom: string; latitude: number; longitude: number; rayon_pointage: number; terrain?: boolean };
 
 function distance(a: number, b: number, c: number, d: number) {
   const r = (x: number) => (x * Math.PI) / 180;
@@ -92,8 +92,8 @@ export default function Pointer({ chantiers, agentId, pays }: { chantiers: Lieu[
       setEtape("Recherche de votre position…");
       const p = await position();
       const c = chantiers.find((x) => (x.id ?? "bureau") === choix)!;
-      const d = Math.round(distance(p.coords.latitude, p.coords.longitude, c.latitude, c.longitude));
-      if (d > c.rayon_pointage) {
+      const d = c.terrain ? 0 : Math.round(distance(p.coords.latitude, p.coords.longitude, c.latitude, c.longitude));
+      if (!c.terrain && d > c.rayon_pointage) {
         throw new Error(`Vous êtes à ${d} m ${c.id ? `du chantier ${c.code}` : "du bureau"} (rayon autorisé : ${c.rayon_pointage} m). Rapprochez-vous pour pointer.`);
       }
       setEtape("Envoi du selfie…");
@@ -116,7 +116,7 @@ export default function Pointer({ chantiers, agentId, pays }: { chantiers: Lieu[
   return (
     <div className="pointage">
       {chantiers.length > 1 && (
-        <label>Chantier où vous êtes affecté
+        <label>Où pointez-vous ?
           <select value={choix} onChange={(e) => setChoix(e.target.value)} disabled={camera}>
             <option value="">— Choisir —</option>
             {chantiers.map((c) => <option key={c.id ?? "bureau"} value={c.id ?? "bureau"}>{c.code} · {c.nom}</option>)}
@@ -142,7 +142,9 @@ export default function Pointer({ chantiers, agentId, pays }: { chantiers: Lieu[
             onChange={(e) => { const f = e.target.files?.[0]; if (f) reduireFichier(f).then(envoyer, () => setMsg({ erreur: "Photo illisible : reprenez-la." })); }} />
         </label>
       )}
-      <p className="note">Votre position est vérifiée au moment du pointage : vous devez être sur place. Le selfie est contrôlé par les RH.</p>
+      <p className="note">{chantiers.find((x) => (x.id ?? "bureau") === choix)?.terrain
+        ? "Pointage terrain : vous pointez là où vous êtes ; votre position est enregistrée avec le selfie, contrôlés par les RH."
+        : "Votre position est vérifiée au moment du pointage : vous devez être sur place. Le selfie est contrôlé par les RH."}</p>
       {msg?.erreur && <p className="erreur">{msg.erreur}</p>}
       {msg?.ok && <p className="succes">{msg.ok}</p>}
     </div>
