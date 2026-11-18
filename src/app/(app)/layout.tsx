@@ -9,11 +9,16 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await exigerSession();
   const terrain = s.profil.poste === "tech";
-  const liens = [
+  const vendeur = s.profil.poste === "vendeur";
+  const liens = vendeur ? [
+    { href: "/pvt", libelle: "Mes ventes" },
+    { href: "/personnel", libelle: "Ma fiche" },
+  ] : [
     { href: "/", libelle: "Tableau de bord" },
     { href: "/chantiers", libelle: "Chantiers" },
     { href: "/raccordements", libelle: "Raccordements" },
   ];
+  if (vendeur) { /* menu réduit */ } else {
   if (s.peut("pointer")) liens.splice(1, 0, { href: "/pointage", libelle: "Je pointe" });
   if (s.peut("tache.maj") || s.peut("tache.creer")) liens.push({ href: "/taches", libelle: terrain ? "Mes tâches" : "Tâches" });
   if (s.peut("dep.demander") || s.peut("dep.valider") || s.peut("dep.valider_tout") || s.peut("dep.payer") || (s.global && s.peut("fin.voir")))
@@ -33,7 +38,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   liens.push({ href: "/rh", libelle: terrain ? "Mon espace RH" : "Ressources humaines" });
   liens.push({ href: "/personnel", libelle: terrain ? "Ma fiche" : "Personnel" });
   liens.push({ href: "/droits", libelle: s.peut("droits.gerer") ? "Rôles et droits" : "Mes droits" });
+  if (s.peut("pvt.voir") || s.peut("pvt.saisir") || s.peut("pvt.gerer")) liens.splice(3, 0, { href: "/pvt", libelle: "Ventes terrain" });
   if (s.peut("param.gerer")) liens.push({ href: "/parametres", libelle: "Paramètres" });
+  }
 
   return (
     <>

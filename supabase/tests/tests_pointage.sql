@@ -89,8 +89,8 @@ begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0
 select pg_temp.check(pg_temp.echoue($$select definir_bureau(0, 0, 200)$$), 'un chef de projet ne déplace pas le bureau');
 select pg_temp.check(exists (select 1 from chantiers_pointage() where code = 'TEL-001'), 'le chef de projet pointe sur le chantier qu''il dirige');
 commit;
-select pg_temp.check((select bool_and(exists (select 1 from permissions_poste pp where pp.poste = p and pp.cle = 'pointer')) from unnest(enum_range(null::poste)) p),
-                     'tout le personnel a le droit de pointer');
+select pg_temp.check((select bool_and(exists (select 1 from permissions_poste pp where pp.poste = p and pp.cle = 'pointer')) from unnest(enum_range(null::poste)) p where p <> 'vendeur'),
+                     'tout le personnel (hors vendeurs terrain) a le droit de pointer');
 
 -- Un jour sans pointage ne se contrôle pas
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000004';

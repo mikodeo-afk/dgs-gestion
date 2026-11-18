@@ -25,8 +25,8 @@ export default function Formulaire({ inactif, pays }: { inactif: boolean; pays: 
         </select>
       </label>
       <label>
-        E-mail
-        <input id="email" name="email" type="email" required autoComplete="email" />
+        E-mail (ou téléphone pour les vendeurs)
+        <input id="email" name="email" type="text" inputMode="email" required autoComplete="username" autoCapitalize="none" />
       </label>
       <label>
         Mot de passe
