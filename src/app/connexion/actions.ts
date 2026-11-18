@@ -14,7 +14,7 @@ export async function seConnecter(_: unknown, form: FormData) {
   // Les identifiants ne fonctionnent que dans le pays où le compte a été créé (sauf accès groupe).
   const { error: e2 } = await supabase.rpc("choisir_pays", { p_code: pays });
   if (e2) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     return { erreur: e2.message.includes("pays") ? "Ces identifiants ne sont pas valables pour ce pays." : "Votre compte n'est pas encore activé. Contactez le service RH." };
   }
   redirect("/");
