@@ -84,7 +84,7 @@ const Tableau = z.object({
     client: z.string(), ligne: z.string(), mobile: z.string(), msan: z.string().describe("MSAN / point FAT, ex. AKP-PL72 FAT293"),
     latitude: z.number().nullable(), longitude: z.number().nullable(),
     date_demande: z.string().describe("Première date de la ligne, AAAA-MM-JJ, vide si absente"),
-    date_limite: z.string().describe("Seconde date de la ligne, AAAA-MM-JJ, vide si absente"),
+    date_affectation: z.string().describe("Seconde date de la ligne (affectation du dossier), AAAA-MM-JJ, vide si absente"),
     offre: z.string(),
   })),
 });
@@ -101,7 +101,7 @@ export async function lirePhotoDossiers(image: string): Promise<{ dossiers?: Dos
       max_tokens: 16000,
       output_config: { effort: "low", format: zodOutputFormat(Tableau) },
       system: `Tu lis la photo d'un tableau de dossiers de raccordement fibre reçus d'un opérateur télécom (Bénin, Mali).
-Chaque ligne du tableau est un dossier : nom du client, numéro de ligne (9 chiffres environ), numéro mobile, MSAN/FAT, coordonnées GPS (latitude puis longitude, parfois coupées sur plusieurs lignes ou séparées par « : »), deux dates (JJ/MM/AAAA à convertir en AAAA-MM-JJ) et l'offre.
+Chaque ligne du tableau est un dossier : nom du client, numéro de ligne (9 chiffres environ), numéro mobile, MSAN/FAT, coordonnées GPS (latitude puis longitude, parfois coupées sur plusieurs lignes ou séparées par « : »), deux dates (demande puis affectation, JJ/MM/AAAA à convertir en AAAA-MM-JJ) et l'offre.
 Recopie exactement, sans rien inventer ; laisse vide ce qui est illisible. Ignore la ligne d'en-têtes.`,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: m[1] as "image/jpeg" | "image/png" | "image/webp", data: m[2] } },

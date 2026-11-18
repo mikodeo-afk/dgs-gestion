@@ -149,7 +149,7 @@ export function lireRapports(texte: string): Rapport[] {
 // ---------------------------------------------------------------------------
 export type Dossier = {
   client: string; ligne: string; mobile?: string; msan?: string; offre?: string;
-  latitude?: number | null; longitude?: number | null; date_demande?: string; date_limite?: string;
+  latitude?: number | null; longitude?: number | null; date_demande?: string; date_affectation?: string;
 };
 type ChampDossier = keyof Dossier | "gps";
 const ENTETES: [RegExp, ChampDossier][] = [
@@ -161,11 +161,11 @@ const ENTETES: [RegExp, ChampDossier][] = [
   [/^latitude/, "latitude"],
   [/^longitude/, "longitude"],
   [/^(date demande|date de demande|date commande|date reception|date de reception|date)$/, "date_demande"],
-  [/^(date limite|delai|date rdv|date de rendez vous|echeance|date fin)/, "date_limite"],
+  [/^(date affectation|date d affectation|affecte le|date transmission|date de transmission|date limite|delai)/, "date_affectation"],
   [/^(offre|forfait|produit|service)/, "offre"],
 ];
 // Ordre des colonnes quand le tableau n'a pas d'en-têtes (modèle reçu de l'opérateur).
-const ORDRE: ChampDossier[] = ["client", "ligne", "mobile", "msan", "gps", "date_demande", "date_limite", "offre"];
+const ORDRE: ChampDossier[] = ["client", "ligne", "mobile", "msan", "gps", "date_demande", "date_affectation", "offre"];
 
 export function lireDossiers(rows: unknown[][]): { dossiers: Dossier[]; sansEntetes: boolean } {
   const iEntete = rows.slice(0, 10).findIndex((r) => r.some((c) => norm(c) && ENTETES.some(([re, ch]) => ch === "client" && re.test(norm(c)))));
@@ -183,7 +183,7 @@ export function lireDossiers(rows: unknown[][]): { dossiers: Dossier[]; sansEnte
       const s = c instanceof Date ? c.toISOString() : String(c).replace(/\s+/g, " ").trim();
       if (ch === "gps") { const p = gps(s); d.latitude = p?.latitude ?? null; d.longitude = p?.longitude ?? null; }
       else if (ch === "latitude" || ch === "longitude") d[ch] = nombre(s);
-      else if (ch === "date_demande" || ch === "date_limite") d[ch] = dateIso(c);
+      else if (ch === "date_demande" || ch === "date_affectation") d[ch] = dateIso(c);
       else if (ch === "ligne" || ch === "mobile") d[ch] = s.replace(/\D/g, "");
       else d[ch] = s;
     });

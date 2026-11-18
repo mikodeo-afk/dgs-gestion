@@ -22,6 +22,8 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 - Paie mensuelle : les RH préparent (primes, avances), le RAF, le PDG ou le DO valide, le comptable paie ; retenue d'absence et INPS calculées ; chacun voit son bulletin.
 - Contrats et congés : fins de contrat à moins de 60 jours, congés acquis (2,5 j/mois).
 
+- Agent comptable (Bénin) : chaque mois, les déclarations à faire (TVA, ITS et redevance ORTB, VPS, AIB retenu, retenue sur loyers, CNSS, acomptes et solde d'IS, états financiers, patente) calculées à partir des factures, dépenses, frais généraux et salariés déclarés, avec leur échéance, le détail du calcul, les alertes (retards, salariés non déclarés, paie non validée) et le registre des déclarations faites. Un assistant IA (clé `ANTHROPIC_API_KEY`) explique les calculs et ce qu'il faut préparer. Les règles sont dans `src/lib/fiscal/regles.ts` ; un autre pays s'ajoute au même endroit.
+
 À venir : l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation), l'impôt sur salaire (ITS) et les pièces jointes (photos de justificatifs).
 
 ## Plusieurs pays
@@ -30,7 +32,7 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 
 ## Mise en service
 
-1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0017`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré, et `0009` que `0008` le soit).
+1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0020`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré, et `0009` que `0008` le soit).
    Pour la lecture des photos (bordereaux, factures, tableaux de dossiers) : ajouter `ANTHROPIC_API_KEY` dans les variables d'environnement de Vercel.
 2. **Vercel** : importer ce dépôt GitHub, puis renseigner les variables d'environnement (voir `.env.example`) :
    - `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API) ;

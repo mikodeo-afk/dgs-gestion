@@ -102,7 +102,7 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
       const { dossiers: d, sansEntetes } = lireDossiers(rows as unknown[][]);
       if (!d.length) throw new Error("Aucun dossier trouvé dans ce fichier.");
       setDossiers(d);
-      if (sansEntetes) setMsg({ ok: "Pas d'en-têtes : colonnes lues dans l'ordre client, ligne, mobile, MSAN/FAT, GPS, date de demande, date limite, offre. Vérifiez l'aperçu." });
+      if (sansEntetes) setMsg({ ok: "Pas d'en-têtes : colonnes lues dans l'ordre client, ligne, mobile, MSAN/FAT, GPS, date de demande, date d'affectation, offre. Vérifiez l'aperçu." });
     } catch (e) {
       setMsg({ erreur: e instanceof Error ? e.message : "Fichier illisible : enregistrez-le au format .xlsx." });
     } finally { if (fichier.current) fichier.current.value = ""; }
@@ -146,7 +146,7 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
         <>
           <div className="tbl">
             <table>
-              <thead><tr><th>Client</th><th>Ligne</th><th>Mobile</th><th>MSAN / FAT</th><th>GPS</th><th>Demande</th><th>Limite</th><th>Offre</th></tr></thead>
+              <thead><tr><th>Client</th><th>Ligne</th><th>Mobile</th><th>MSAN / FAT</th><th>GPS</th><th>Demande</th><th>Affectation</th><th>Offre</th></tr></thead>
               <tbody>
                 {dossiers.map((d, i) => (
                   <tr key={i}>
@@ -155,7 +155,7 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
                     <td>{d.mobile}</td><td>{d.msan}</td>
                     <td className="note">{d.latitude != null ? `${d.latitude.toFixed(5)}, ${d.longitude?.toFixed(5)}` : "—"}</td>
                     <td><input type="date" value={d.date_demande ?? ""} onChange={(e) => maj(i, { date_demande: e.target.value })} /></td>
-                    <td><input type="date" value={d.date_limite ?? ""} onChange={(e) => maj(i, { date_limite: e.target.value })} /></td>
+                    <td><input type="date" value={d.date_affectation ?? ""} onChange={(e) => maj(i, { date_affectation: e.target.value })} /></td>
                     <td>{d.offre}</td>
                   </tr>
                 ))}
@@ -176,8 +176,8 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
 // --- Liste des dossiers, affectation, échec --------------------------------------
 export type LigneDossier = {
   id: string; client: string; ligne: string; mobile: string | null; msan: string | null; offre: string | null;
-  latitude: number | null; longitude: number | null; date_demande: string | null; date_limite: string | null;
-  statut: string; equipe: string | null; realise_le: string | null; motif_echec: string | null; materiel: string; retard: boolean;
+  latitude: number | null; longitude: number | null; date_demande: string | null; date_affectation: string | null;
+  statut: string; equipe: string | null; realise_le: string | null; motif_echec: string | null; materiel: string; attente: number | null;
 };
 const dateFr = (d: string | null) => (d ? d.slice(0, 10).split("-").reverse().join("/") : "—");
 const TON: Record<string, string> = { "À affecter": "p-warn", Affecté: "p-info", Réalisé: "p-ok", Échec: "p-bad" };
@@ -212,7 +212,7 @@ export function TableDossiers({ dossiers, equipes, gere }: { dossiers: LigneDoss
       <Retour etat={msg} />
       <div className="tbl">
         <table>
-          <thead><tr>{gere && <th></th>}<th>Client</th><th>Ligne</th><th>MSAN / FAT</th><th>Offre</th><th>Limite</th><th>Équipe</th><th>Statut</th><th>Matériel posé</th><th></th></tr></thead>
+          <thead><tr>{gere && <th></th>}<th>Client</th><th>Ligne</th><th>MSAN / FAT</th><th>Offre</th><th>Affecté le</th><th>Équipe</th><th>Statut</th><th>Matériel posé</th><th></th></tr></thead>
           <tbody>
             {dossiers.map((d) => (
               <tr key={d.id}>
@@ -223,7 +223,7 @@ export function TableDossiers({ dossiers, equipes, gere }: { dossiers: LigneDoss
                   <div><a className="note" href={`https://www.google.com/maps?q=${d.latitude},${d.longitude}`} target="_blank" rel="noreferrer">📍 carte</a></div>
                 )}</td>
                 <td className="note">{d.offre ?? "—"}</td>
-                <td className={d.retard ? "neg" : ""}>{dateFr(d.date_limite)}</td>
+                <td>{dateFr(d.date_affectation)}{d.attente != null && <div className={d.attente > 2 ? "neg" : "note"}>{d.attente === 0 ? "aujourd'hui" : `${d.attente} j d'attente`}</div>}</td>
                 <td>{d.equipe ?? "—"}</td>
                 <td><span className={`pill ${TON[d.statut] ?? "p-info"}`}>{d.statut}</span>
                   {d.realise_le && <div className="note">le {dateFr(d.realise_le)}</div>}

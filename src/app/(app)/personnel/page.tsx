@@ -21,6 +21,7 @@ export default async function Personnel() {
   ]);
   const tous = (profils ?? []) as Profil[];
   const sal = new Map((rem ?? []).map((r) => [r.profil_id, Number(r.salaire_base)]));
+  const decl = new Map((rem ?? []).map((r) => [r.profil_id, { declare: r.declare_cnss !== false, numero: (r.numero_cnss as string | null) ?? "" }]));
   const voitSal = s.peut("sal.voir");
   const edite = s.peut("emp.ajouter");
   const gere = s.peut("droits.gerer");
@@ -70,7 +71,12 @@ export default async function Personnel() {
                   <td>{p.responsable_id ? noms.get(p.responsable_id) : "—"}</td>
                   <td>{p.contrat}{p.date_fin && <><br /><span className="note">fin {dateFr(p.date_fin)}</span></>}</td>
                   <td className="num">{dateFr(p.date_embauche)}</td>
-                  {voitSal && <td className="num">{sal.has(p.id) ? fcfa(sal.get(p.id)) : "—"}</td>}
+                  {voitSal && (
+                    <td className="num">
+                      {sal.has(p.id) ? fcfa(sal.get(p.id)) : "—"}
+                      {sal.get(p.id) ? <><br /><span className="note">{decl.get(p.id)?.declare ? `Déclaré${decl.get(p.id)?.numero ? ` · CNSS ${decl.get(p.id)?.numero}` : ""}` : "Non déclaré"}</span></> : null}
+                    </td>
+                  )}
                   <td>
                     {p.actif ? <Pastille texte="Actif" ton="ok" /> : <Pastille texte="Inactif" ton="bad" />}
                     {gere && p.id !== s.profil.id && (
@@ -95,6 +101,12 @@ export default async function Personnel() {
                         </select>
                         <input name="date_fin" type="date" defaultValue={p.date_fin ?? ""} aria-label={`Fin de contrat de ${p.nom}`} />
                         {voitSal && <input name="salaire" type="number" min="0" step="1000" defaultValue={sal.get(p.id) ?? 0} aria-label={`Salaire de ${p.nom}`} style={{ width: 110 }} />}
+                        {voitSal && <input name="numero_cnss" defaultValue={decl.get(p.id)?.numero ?? ""} placeholder="N° CNSS" aria-label={`Numéro CNSS de ${p.nom}`} style={{ width: 100 }} />}
+                        {voitSal && (
+                          <label className="note" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <input name="declare_cnss" type="checkbox" value="1" defaultChecked={decl.get(p.id)?.declare ?? true} /> Déclaré
+                          </label>
+                        )}
                         <button className="btn sm" type="submit">Enregistrer</button>
                       </form>
                     </td>
