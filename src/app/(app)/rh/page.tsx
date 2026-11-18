@@ -115,7 +115,7 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
                               <figure>{ref ? <img src={ref} alt={`Photo de référence de ${a?.nom}`} /> : <span className="vide">Pas de photo de référence</span>}Référence</figure>
                             </div>
                           </td>
-                          <td>{heureFr(p.heure_arrivee)} · {p.chantier_id ? codes.get(p.chantier_id) ?? "Chantier" : "Bureau"}<br /><span className="note">à {p.distance_m} m{p.precision_m ? ` (GPS ± ${p.precision_m} m)` : ""}</span></td>
+                          <td>{heureFr(p.heure_arrivee)} · {p.terrain ? "Terrain" : p.chantier_id ? codes.get(p.chantier_id) ?? "Chantier" : "Bureau"}<br /><span className="note">{p.terrain ? (p.latitude != null ? <a href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`} target="_blank" rel="noopener">voir la position</a> : "position enregistrée") : `à ${p.distance_m} m`}{p.precision_m ? ` (GPS ± ${p.precision_m} m)` : ""}</span></td>
                           <td>
                             {p.controle === "À contrôler"
                               ? <ControlePointage profilId={p.profil_id} nom={a?.nom ?? ""} jour={jour} />

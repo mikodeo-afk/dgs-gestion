@@ -14,9 +14,11 @@ export async function pointer(p: { chantierId: string | null; lat: number; lon: 
     p_chantier: p.chantierId, p_lat: p.lat, p_lon: p.lon, p_precision: Math.round(p.precision), p_photo: p.photo,
   });
   if (error) return { erreur: error.message };
-  const r = data as { lieu: string; distance_m: number };
-  await journaliser(`a pointé son arrivée sur ${r.lieu} (${r.distance_m} m)`);
+  const r = data as { lieu: string; distance_m: number | null; terrain?: boolean };
+  await journaliser(r.terrain ? "a pointé son arrivée sur le terrain" : `a pointé son arrivée sur ${r.lieu} (${r.distance_m} m)`);
   revalidatePath("/pointage");
   revalidatePath("/rh");
-  return { ok: `Arrivée enregistrée (${r.lieu}, à ${r.distance_m} m). Les RH vont vérifier votre selfie.` };
+  return { ok: r.terrain
+    ? "Arrivée enregistrée sur le terrain, avec votre position. Les RH vont vérifier votre selfie."
+    : `Arrivée enregistrée (${r.lieu}, à ${r.distance_m} m). Les RH vont vérifier votre selfie.` };
 }

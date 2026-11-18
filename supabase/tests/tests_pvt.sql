@@ -6,6 +6,8 @@ create or replace function pg_temp.check(cond boolean, msg text) returns void la
 begin if not cond then raise exception 'ÉCHEC : %', msg; end if; raise notice 'ok : %', msg; end $$;
 create or replace function pg_temp.echoue(sql text) returns boolean language plpgsql as $$
 begin execute sql; return false; exception when others then return true; end $$;
+create or replace function pg_temp.erreur(sql text) returns text language plpgsql as $$
+begin execute sql; return ''; exception when others then return sqlerrm; end $$;
 
 -- Commercial du Bénin, et un vendeur terrain qui a un compte (technicien du Bénin).
 insert into auth.users (id,email,raw_user_meta_data) values
@@ -142,6 +144,13 @@ begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0
 select pg_temp.check(a_droit('pvt.gerer') and a_droit('pointer') and not est_global(), 'le superviseur gère les ventes terrain, pointe, sans vue globale');
 select pg_temp.check((select array_agg(x) from mes_chantiers() x) = array['10000000-0000-0000-0000-000000000040'::uuid], 'son projet est le projet PVT');
 select pg_temp.check((select count(*) from pvt_ventes) > 0, 'il voit les ventes terrain');
+select pg_temp.check(pg_temp.erreur($$select pointer(null, 6.40, 2.40, 400, 'BJ/00000000-0000-0000-0000-000000000062/a.jpg')$$) like '%trop imprécise%',
+                     'pointage terrain : la précision GPS reste exigée');
+select pg_temp.check(pg_temp.erreur($$select pointer(null, 6.40, 2.40, 10, null)$$) like '%selfie%', 'pointage terrain : selfie obligatoire');
+select pg_temp.check((pointer(null, 6.40, 2.40, 10, 'BJ/00000000-0000-0000-0000-000000000062/s.jpg') ->> 'terrain')::boolean,
+                     'le superviseur pointe sur le terrain, sans bureau ni rayon');
+select pg_temp.check((select terrain and distance_m is null and latitude = 6.40 and controle = 'À contrôler' from presences
+                       where profil_id = '00000000-0000-0000-0000-000000000062' and jour = current_date), 'pointage terrain enregistré avec sa position, à contrôler');
 commit;
 
 -- Isolement par pays : un compte du Mali ne voit rien.
