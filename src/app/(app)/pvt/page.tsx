@@ -6,15 +6,15 @@ import { aujourdhui, dateFr, fcfa } from "@/lib/format";
 import { Kpi, Pastille } from "@/components/ui";
 import {
   echeances, factureSbin, fenetreAvance, moisFr, moisPrecedent, moisSuivant, parVendeur, retention,
-  type Mois, type Offre, type Vendeur, type Vente, type Versement,
+  type Facture, type Mois, type Offre, type Vendeur, type Vente, type Versement,
 } from "@/lib/pvt";
 import {
-  Attribuer, BasculerVendeur, CompteVendeur, EtatLigne, FormContrat, FormMois, FormOffre, FormVendeur, FormVente, FormVersement,
+  Attribuer, BasculerVendeur, CompteVendeur, ModifierVendeur, EtatLigne, FormContrat, FormMois, FormOffre, FormVendeur, FormVente, FormVersement,
   ImportExtraction, SupprimerVente, SupprimerVersement, VerserAvances,
 } from "./Composants";
 
 const ONGLETS = [["mois", "Suivi du mois"], ["ventes", "Ventes"], ["lignes", "Statut des lignes"], ["vendeurs", "Vendeurs"], ["offres", "Offres et contrat"]] as const;
-const TON: Record<string, "ok" | "warn" | "bad"> = { Déclarée: "warn", Validée: "ok", Rejetée: "bad", Active: "ok", Suspendue: "bad", Résiliée: "bad" };
+const TON: Record<string, "ok" | "warn" | "bad"> = { Reportée: "warn", Déclarée: "warn", Validée: "ok", Rejetée: "bad", Active: "ok", Suspendue: "bad", Résiliée: "bad" };
 
 export default async function VentesTerrain({ searchParams }: { searchParams: Promise<{ mois?: string; onglet?: string }> }) {
   const s = await exigerSession();
@@ -84,7 +84,7 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
       </div>
 
       <div className="kpis">
-        <Kpi libelle="Ventes déclarées (point temporaire)" valeur={nb("Déclarée") + nb("Validée")} unite={`dont ${nb("Validée")} validée(s)`} />
+        <Kpi libelle="Ventes déclarées (point temporaire)" valeur={nb("Déclarée") + nb("Validée") + nb("Reportée")} unite={`dont ${nb("Validée")} validée(s)${nb("Reportée") ? `, ${nb("Reportée")} reportée(s)` : ""}`} />
         {estVendeur && moi ? (() => {
           const l = lignesV.find((x) => x.vendeur.id === moi.id);
           return <>
@@ -112,14 +112,14 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
             <div className="tbl">
               <table>
                 <thead><tr><th>Vendeur</th><th className="num">Déclarées</th><th className="num">Validées</th><th className="num">Part sur le déclaré</th><th className="num">Avance ({tauxAvance} %)</th>
-                  <th className="num">Part validée</th><th className="num">Prime VTM</th><th className="num">Transport</th><th className="num">Bonus rétention</th><th className="num">Déjà versé</th><th className="num">Reste dû</th></tr></thead>
+                  <th className="num">Part validée</th><th className="num">Prime VTM / VTB</th><th className="num">Transport</th><th className="num">Bonus rétention</th><th className="num">Déjà versé</th><th className="num">Reste dû</th></tr></thead>
                 <tbody>
                   {lignesV.filter((l) => l.declarees || l.validees || l.avancesVersees || l.bonusRetention).map((l) => (
                     <tr key={l.vendeur.id}>
                       <td>{l.vendeur.nom}{l.avanceHorsFenetre && <><br /><Pastille texte="Avance hors période 30→05" ton="warn" /></>}</td>
-                      <td className="num">{l.declarees}</td><td className="num">{l.validees}{l.rejetees > 0 && <span className="note"> ({l.rejetees} rej.)</span>}</td>
+                      <td className="num">{l.declarees}</td><td className="num">{l.validees}{l.reportees > 0 && <span className="note"> ({l.reportees} rep.)</span>}{l.rejetees > 0 && <span className="note"> ({l.rejetees} rej.)</span>}</td>
                       <td className="num">{fcfa(l.partDeclaree)}</td><td className="num">{fcfa(l.avanceCalculee)}</td>
-                      <td className="num">{fcfa(l.partValidee)}</td><td className="num">{fcfa(l.vtm)}</td><td className="num">{fcfa(l.transport)}</td><td className="num">{fcfa(l.bonusRetention)}</td>
+                      <td className="num">{fcfa(l.partValidee)}</td><td className="num">{fcfa(l.vtm + l.vtb)}</td><td className="num">{fcfa(l.transport)}</td><td className="num">{fcfa(l.bonusRetention)}</td>
                       <td className="num">{fcfa(l.avancesVersees + l.soldesVerses)}</td>
                       <td className="num"><b className={l.du < 0 ? "erreur" : ""}>{fcfa(l.du)}</b></td>
                     </tr>
@@ -154,18 +154,29 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
             <div className="tbl">
               <table>
                 <tbody>
-                  <tr><td>Commissions sur {fac.nombre} vente(s) validée(s)</td><td className="num">{fcfa(fac.commissions)}</td></tr>
-                  <tr><td className="note">dont part des vendeurs / part DGS</td><td className="num note">{fcfa(fac.partVendeurs)} / {fcfa(fac.partPartenaire)}</td></tr>
-                  <tr><td>Prime de performance ({fac.nB2c} FTTH B2C, {fac.nFtto} FTTO{fac.nouveau ? ", seuils des 2 premiers mois" : ""})</td><td className="num">{fcfa(fac.performance)}</td></tr>
-                  <tr><td>Prime d&apos;objectif</td><td className="num">{fcfa(fac.objectif)}</td></tr>
-                  <tr><td>Primes vendeurs VTM</td><td className="num">{fcfa(fac.vtm)}</td></tr>
-                  <tr><td>Primes de transport B2B</td><td className="num">{fcfa(fac.transport)}</td></tr>
-                  <tr><td>Rétention : bonus vendeurs</td><td className="num">{fcfa(fac.retentionVendeurs)}</td></tr>
-                  <tr><td>Rétention : bonus / malus partenaire{fac.retentionARenseigner > 0 && <span className="note"> ({fac.retentionARenseigner} ligne(s) à renseigner)</span>}</td><td className="num">{fcfa(fac.retentionPartenaire)}</td></tr>
-                  {fac.ajustement !== 0 && <tr><td>Ajustement {m?.ajustement_motif ? `(${m.ajustement_motif})` : ""}</td><td className="num">{fcfa(fac.ajustement)}</td></tr>}
-                  <tr><th>Total HT</th><th className="num">{fcfa(fac.ht)}</th></tr>
-                  <tr><td>TVA {taux.tva} %</td><td className="num">{fcfa(fac.tva)}</td></tr>
-                  <tr><th>Total TTC à facturer à SBIN</th><th className="num">{fcfa(fac.ttc)}</th></tr>
+                  {(() => {
+                    const L = (libelle: React.ReactNode, k: keyof Facture, note?: boolean) => (
+                      <tr className={note ? "note" : undefined}><td>{libelle}</td><td className="num">{fcfa(fac.b2c[k])}</td><td className="num">{fcfa(fac.b2b[k])}</td><td className="num">{fcfa(fac.b2c[k] + fac.b2b[k])}</td></tr>
+                    );
+                    return <>
+                      <tr><th /><th className="num">FTTH (B2C)</th><th className="num">FTTO… (B2B)</th><th className="num">Total</th></tr>
+                      {L("Ventes validées (dont arriérés payés ce mois)", "nombre")}
+                      {L("Commissions", "commissions")}
+                      {L("dont part des vendeurs (VTB)", "partVendeurs", true)}
+                      {L("dont part DGS (PVT)", "partPartenaire", true)}
+                      {L(`Prime PVT par vente${fac.nouveau ? " (seuils des 2 premiers mois)" : ""}`, "performance")}
+                      {L("Primes vendeurs (VTM en B2C, VTB en B2B)", "primesVendeurs")}
+                      {L("Prime d'objectif (contrat)", "objectif")}
+                      {(fac.b2b.transport > 0) && L("Primes de transport", "transport")}
+                      {L("Rétention : bonus vendeurs", "retentionVendeurs")}
+                      {L(<>Rétention : bonus / malus DGS{fac.retentionARenseigner > 0 && <span className="note"> ({fac.retentionARenseigner} ligne(s) à renseigner)</span>}</>, "retentionPartenaire")}
+                      {L("Total HT", "ht")}
+                    </>;
+                  })()}
+                  {fac.ajustement !== 0 && <tr><td colSpan={3}>Ajustement {m?.ajustement_motif ? `(${m.ajustement_motif})` : ""}</td><td className="num">{fcfa(fac.ajustement)}</td></tr>}
+                  <tr><th colSpan={3}>Total HT</th><th className="num">{fcfa(fac.ht)}</th></tr>
+                  <tr><td colSpan={3}>TVA {taux.tva} %</td><td className="num">{fcfa(fac.tva)}</td></tr>
+                  <tr><th colSpan={3}>Total TTC à facturer à SBIN</th><th className="num">{fcfa(fac.ttc)}</th></tr>
                 </tbody>
               </table>
             </div>
@@ -261,21 +272,21 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
           {gere && <details><summary className="btn sm pri">Ajouter un vendeur</summary><FormVendeur /></details>}
           <div className="tbl">
             <table>
-              <thead><tr><th>Vendeur</th><th>Téléphone · n° Celtiis</th><th>Pièce</th><th>Segment</th><th>Depuis</th><th>Compte</th><th /></tr></thead>
+              <thead><tr><th>Vendeur · login SBIN</th><th>Téléphone · n° Celtiis</th><th>Pièce</th><th>Segment</th><th>Depuis</th><th>Compte</th><th /></tr></thead>
               <tbody>
                 {vendeurs.map((v) => (
                   <tr key={v.id} style={v.actif ? undefined : { opacity: 0.55 }}>
-                    <td>{v.nom}</td><td>{v.telephone ?? "—"}<br /><span className="note">{v.numero_celtiis}</span></td><td>{v.piece_identite ?? "—"}</td>
+                    <td>{v.nom}<br /><span className="note code">{v.login_sbin ?? "login SBIN à renseigner"}</span></td><td>{v.telephone ?? "—"}<br /><span className="note">{v.numero_celtiis}</span></td><td>{v.piece_identite ?? "—"}</td>
                     <td>{v.segment}</td><td>{dateFr(v.debut)}</td>
                     <td>{v.profil_id ? <Pastille texte="Oui" ton="ok" /> : gere ? <CompteVendeur id={v.id} /> : "Non"}</td>
-                    <td>{gere && <BasculerVendeur id={v.id} actif={v.actif} />}</td>
+                    <td>{gere && <><ModifierVendeur v={v} /><BasculerVendeur id={v.id} actif={v.actif} /></>}</td>
                   </tr>
                 ))}
                 {!vendeurs.length && <tr><td colSpan={7} className="note">Aucun vendeur.</td></tr>}
               </tbody>
             </table>
           </div>
-          <p className="note">Un vendeur qui a un compte se connecte avec son numéro de téléphone (ou son e-mail) et voit seulement ses ventes, ses avances et le statut de ses lignes.</p>
+          <p className="note">Le login SBIN (pvt_dgs_…) relie automatiquement les lignes des extractions au vendeur ; les vendeurs inconnus sont créés à l&apos;import, avec leur login comme nom provisoire. Un vendeur qui a un compte se connecte avec son numéro de téléphone (ou son e-mail) et voit seulement ses ventes, ses avances et le statut de ses lignes.</p>
         </section>
       )}
 
@@ -298,7 +309,7 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
             </table>
           </div>
           {gere && <details><summary className="btn sm">Ajouter une offre</summary><FormOffre /></details>}
-          <p className="note">Primes calculées automatiquement : VTM vendeur (15 ventes B2C et plus), performance et objectif DGS (seuils de l&apos;annexe 3, réduits les 2 premiers mois du contrat), transport B2B (1 500 par vente, 30 000 au plus, 2 premiers mois du vendeur), rétention selon le statut des lignes.</p>
+          <p className="note">Primes calculées automatiquement : VTM vendeur B2C (15 ventes et plus), VTB vendeur B2B (5 ventes et plus), performance et objectif DGS (seuils de l&apos;annexe 3, réduits les 2 premiers mois du contrat), transport B2B (1 500 par vente, 30 000 au plus, 2 premiers mois du vendeur), rétention selon le statut des lignes.</p>
         </section>
       )}
     </>

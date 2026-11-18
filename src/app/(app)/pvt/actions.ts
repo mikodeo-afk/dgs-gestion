@@ -65,14 +65,18 @@ export async function importerExtraction(mois: string, lignes: LigneExtraction[]
   await exigerDroit("pvt.gerer");
   const supabase = await supabaseServeur();
   const { data, error } = await supabase.rpc("pvt_rapprocher_extraction", {
-    p_mois: mois, p_lignes: lignes.map((l) => ({ ligne: l.ligne, offre: l.offre, date: l.date || null, client: l.client || null })),
+    p_mois: mois, p_lignes: lignes.map((l) => ({
+      ligne: l.ligne, offre: l.offre, date: l.date || null, client: l.client || null,
+      login: l.login || null, statut: l.statut, motif: l.motif || null, etat: l.etat || null,
+    })),
   });
   if (error) return { erreur: error.message };
-  const r = data as { validees: number; ajoutees: number; offres_inconnues: number; codes_inconnus: string[] };
-  await journaliser(`a importé l'extraction SBIN de ${mois.slice(0, 7)} : ${r.validees} vente(s) validée(s), ${r.ajoutees} ajoutée(s)`);
+  const r = data as { validees: number; reportees: number; rejetees: number; ajoutees: number; vendeurs_crees: number; offres_inconnues: number; codes_inconnus: string[] };
+  await journaliser(`a importé l'extraction SBIN de ${mois.slice(0, 7)} : ${r.validees} vente(s) validée(s), ${r.reportees} reportée(s), ${r.rejetees} non validée(s)`);
   revalidatePath("/pvt");
   return {
-    ok: `${r.validees} vente(s) déclarée(s) validée(s), ${r.ajoutees} ligne(s) SBIN non déclarée(s) ajoutée(s) à attribuer.` +
+    ok: `${r.validees} vente(s) validée(s), ${r.reportees} paiement(s) reporté(s), ${r.rejetees} vente(s) non validée(s) ; ${r.ajoutees} ligne(s) qui n'avaient pas été déclarées ont été ajoutées.` +
+      (r.vendeurs_crees ? ` ${r.vendeurs_crees} vendeur(s) créé(s) d'après leur login SBIN : complétez leur nom dans l'onglet Vendeurs.` : "") +
       (r.offres_inconnues ? ` ${r.offres_inconnues} ligne(s) ignorée(s) : offre inconnue (${r.codes_inconnus.join(", ")}), ajoutez-la dans les offres puis réimportez.` : ""),
   };
 }
@@ -159,7 +163,7 @@ export async function creerVendeur(_: Etat, f: FormData): Promise<Etat> {
     if (e2) return { erreur: "Compte créé mais fiche incomplète : " + e2.message };
   }
   const { error } = await supabase.from("pvt_vendeurs").insert({
-    nom, telephone: txt(f, "telephone") || null, numero_celtiis: txt(f, "numero_celtiis") || null,
+    nom, telephone: txt(f, "telephone") || null, numero_celtiis: txt(f, "numero_celtiis") || null, login_sbin: loginSbin(txt(f, "login_sbin")),
     piece_identite: txt(f, "piece_identite") || null, segment: txt(f, "segment") || "B2C", debut: txt(f, "debut") || undefined, profil_id: profil,
   });
   if (error) return { erreur: error.message.includes("pvt_vendeurs_nom") ? `Le vendeur ${nom} existe déjà.` : error.message };
@@ -188,6 +192,21 @@ export async function creerCompteVendeur(_: Etat, f: FormData): Promise<Etat> {
   if (e2) return { erreur: e2.message };
   await journaliser(`a créé le compte du vendeur terrain ${v.nom}`);
   return fini(`Compte créé. Identifiant : ${identifiant.endsWith("@vendeur.dgs") ? "son numéro de téléphone" : identifiant}.`);
+}
+
+const loginSbin = (t: string) => t.trim().toLowerCase().replace(/\.[a-z]+$/, "") || null;
+
+export async function modifierVendeur(_: Etat, f: FormData): Promise<Etat> {
+  await exigerDroit("pvt.gerer");
+  const supabase = await supabaseServeur();
+  const nom = txt(f, "nom");
+  const { data: v, error } = await supabase.from("pvt_vendeurs").update({
+    nom, telephone: txt(f, "telephone") || null, numero_celtiis: txt(f, "numero_celtiis") || null,
+    piece_identite: txt(f, "piece_identite") || null, segment: txt(f, "segment") || "B2C", login_sbin: loginSbin(txt(f, "login_sbin")),
+  }).eq("id", txt(f, "id")).select("profil_id").single();
+  if (error) return { erreur: error.message.includes("pvt_vendeurs_login") ? "Ce login SBIN est déjà celui d'un autre vendeur." : error.message.includes("pvt_vendeurs_nom") ? `Le vendeur ${nom} existe déjà.` : error.message };
+  if (v.profil_id) await supabaseAdmin().from("profils").update({ nom }).eq("id", v.profil_id);
+  return fini("Vendeur mis à jour.");
 }
 
 export async function basculerVendeur(id: string, actif: boolean): Promise<Etat> {

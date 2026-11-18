@@ -1,9 +1,9 @@
 "use client";
 import { useActionState, useRef, useState, useTransition } from "react";
 import { fcfa } from "@/lib/format";
-import { lireExtraction, type LigneExtraction, type Offre } from "@/lib/pvt";
+import { lireExtraction, scoreFeuille, type LigneExtraction, type Offre } from "@/lib/pvt";
 import {
-  attribuerVente, basculerVendeur, creerCompteVendeur, creerVendeur, declarerVente, enregistrerVersement, importerExtraction,
+  attribuerVente, basculerVendeur, creerCompteVendeur, modifierVendeur, creerVendeur, declarerVente, enregistrerVersement, importerExtraction,
   majContrat, majEtatLigne, majMois, majOffre, rejeterNonValidees, supprimerVente, supprimerVersement, verserAvances, type Etat,
 } from "./actions";
 
@@ -91,44 +91,71 @@ export function Attribuer({ id, vendeurs }: { id: string; vendeurs: Option[] }) 
 // --- Extraction SBIN --------------------------------------------------------------------------
 export function ImportExtraction({ mois, offres, declarees }: { mois: string; offres: Offre[]; declarees: number }) {
   const [lignes, setLignes] = useState<LigneExtraction[]>([]);
+  const [feuilles, setFeuilles] = useState<string[]>([]);
+  const [feuille, setFeuille] = useState("");
+  const [fichierLu, setFichierLu] = useState<File | null>(null);
   const [msg, setMsg] = useState<Etat>(null);
   const [enCours, demarrer] = useTransition();
   const fichier = useRef<HTMLInputElement>(null);
-  const codes = new Set(offres.map((o) => o.code));
+  const codes = new Set(offres.map((o) => o.code.toLowerCase()));
+  const connue = (l: LigneExtraction) => codes.has(l.offre.toLowerCase());
+
+  async function lireFeuille(f: File, nom: string) {
+    const { default: readXlsxFile } = await import("read-excel-file");
+    const l = lireExtraction((await readXlsxFile(f, { sheet: nom })) as unknown[][], offres);
+    if (!l.length) throw new Error(`Aucune vente trouvée dans la feuille « ${nom} ».`);
+    setLignes(l); setFeuille(nom);
+  }
 
   async function lire(f: File) {
-    setMsg(null); setLignes([]);
+    setMsg(null); setLignes([]); setFeuilles([]);
     try {
-      const { default: readXlsxFile } = await import("read-excel-file");
-      const l = lireExtraction((await readXlsxFile(f)) as unknown[][], offres);
-      if (!l.length) throw new Error("Aucune ligne trouvée dans ce fichier.");
-      setLignes(l);
+      const { default: readXlsxFile, readSheetNames } = await import("read-excel-file");
+      const noms = await readSheetNames(f);
+      // La feuille de détail des ventes : celle qui a MSISDN + DEBIT (+ LOGIN_VENDEUR) et le plus de lignes.
+      let meilleure = "", score = 0;
+      for (const n of noms) {
+        const sc = scoreFeuille((await readXlsxFile(f, { sheet: n })) as unknown[][]).score;
+        if (sc > score) { score = sc; meilleure = n; }
+      }
+      if (!meilleure) throw new Error("Aucune feuille ne contient les colonnes MSISDN (ou Ligne) et DEBIT (ou Offre).");
+      setFeuilles(noms); setFichierLu(f);
+      await lireFeuille(f, meilleure);
     } catch (e) {
       setMsg({ erreur: e instanceof Error ? e.message : "Fichier illisible : enregistrez-le au format .xlsx." });
     } finally { if (fichier.current) fichier.current.value = ""; }
   }
-  const inconnues = lignes.filter((l) => !codes.has(l.offre)).length;
+
+  const inconnues = lignes.filter((l) => !connue(l)).length;
+  const compte = (st: string) => lignes.filter((l) => l.statut === st).length;
   return (
     <div>
       <div className="inline">
-        <label>Fichier Excel de l&apos;extraction SBIN<input ref={fichier} type="file" accept=".xlsx" onChange={(e) => e.target.files?.[0] && lire(e.target.files[0])} /></label>
-        {declarees > 0 && <Bouton action={() => rejeterNonValidees(mois)} texte={`Rejeter les ${declarees} vente(s) non validée(s)`} classe="btn sm bad"
+        <label>Fichier Excel de l&apos;extraction SBIN (FTTH ou FTTO)<input ref={fichier} type="file" accept=".xlsx" onChange={(e) => e.target.files?.[0] && lire(e.target.files[0])} /></label>
+        {feuilles.length > 1 && fichierLu && (
+          <label>Feuille lue<select value={feuille} onChange={(e) => lireFeuille(fichierLu, e.target.value).catch((er) => setMsg({ erreur: String(er.message ?? er) }))}>
+            {feuilles.map((n) => <option key={n}>{n}</option>)}</select></label>
+        )}
+        {declarees > 0 && <Bouton action={() => rejeterNonValidees(mois)} texte={`Rejeter les ${declarees} vente(s) déclarée(s) absente(s) de l'extraction`} classe="btn sm bad"
           confirmer="Les ventes déclarées de ce mois absentes de l'extraction passent en « Rejetée ». Continuer ?" />}
       </div>
-      <p className="note">Colonnes reconnues : ligne (ou numéro, MSISDN), offre (ou produit, forfait), date d&apos;activation, client. Les ventes déclarées sont validées ligne par ligne ; les lignes SBIN non déclarées sont ajoutées sans vendeur, à attribuer.</p>
+      <p className="note">Importez le fichier SBIN tel quel : la feuille de détail (LISTE CLIENTS en FTTH, REAL en FTTO) est retrouvée seule. Chaque ligne est attribuée au vendeur d&apos;après son LOGIN_VENDEUR. « A payer » et « Arriéré à payer » valident la vente dans ce mois ; « Paiement reporté » la laisse ouverte ; « Vte non validée » la rejette avec son motif. Importez les deux fichiers (FTTH puis FTTO) pour le même mois.</p>
       {lignes.length > 0 && (
         <>
-          <p>{lignes.length} ligne(s) lue(s){inconnues > 0 && <> · <b className="erreur">{inconnues} offre(s) non reconnue(s)</b> (ignorées tant que l&apos;offre n&apos;existe pas dans la grille)</>}</p>
+          <p>Feuille « {feuille} » : {lignes.length} ligne(s) · <b>{compte("Validée")} à payer</b> · {compte("Reportée")} reportée(s) · {compte("Rejetée")} non validée(s)
+            {inconnues > 0 && <> · <b className="erreur">{inconnues} offre(s) non reconnue(s)</b> (ignorées tant que l&apos;offre n&apos;existe pas dans la grille)</>}</p>
           <div className="tbl" style={{ maxHeight: 280, overflow: "auto" }}>
             <table>
-              <thead><tr><th>Ligne</th><th>Offre lue</th><th>Offre retenue</th><th>Date</th><th>Client</th></tr></thead>
-              <tbody>{lignes.slice(0, 200).map((l, i) => (
-                <tr key={i}><td className="code">{l.ligne}</td><td>{l.offreLue}</td><td className={codes.has(l.offre) ? "code" : "erreur"}>{codes.has(l.offre) ? l.offre : "?"}</td><td>{l.date}</td><td>{l.client}</td></tr>
+              <thead><tr><th>Ligne</th><th>Vendeur (login)</th><th>Offre</th><th>Date</th><th>Client</th><th>SBIN</th></tr></thead>
+              <tbody>{lignes.slice(0, 300).map((l, i) => (
+                <tr key={i}><td className="code">{l.ligne}</td><td className="note">{l.login}</td>
+                  <td className={connue(l) ? "code" : "erreur"}>{connue(l) ? l.offre : `? ${l.offreLue}`}</td><td>{l.date}</td><td>{l.client}</td>
+                  <td>{l.statut}{l.motif && <><br /><span className="note">{l.motif}</span></>}{l.etat && <><br /><span className="note">ligne {l.etat.toLowerCase()}</span></>}</td></tr>
               ))}</tbody>
             </table>
           </div>
           <button className="btn pri" type="button" disabled={enCours} onClick={() => demarrer(async () => { const r = await importerExtraction(mois, lignes); setMsg(r); if (r?.ok) setLignes([]); })}>
-            Rapprocher avec les ventes déclarées
+            Rapprocher avec les ventes de {mois.slice(5, 7)}/{mois.slice(0, 4)}
           </button>
         </>
       )}
@@ -226,6 +253,7 @@ export function FormVendeur() {
       <label>Nom et prénoms<input name="nom" required /></label>
       <label>Téléphone<input name="telephone" inputMode="tel" required={compte} /></label>
       <label>N° Celtiis (vente)<input name="numero_celtiis" inputMode="tel" /></label>
+      <label>Login SBIN<input name="login_sbin" placeholder="ex. pvt_dgs_alucresse" autoCapitalize="none" /></label>
       <label>Pièce d&apos;identité<input name="piece_identite" placeholder="Type et numéro" /></label>
       <label>Segment<select name="segment"><option>B2C</option><option>B2B</option></select></label>
       <label>Début<input name="debut" type="date" /></label>
@@ -250,6 +278,26 @@ export function CompteVendeur({ id }: { id: string }) {
         <label>E-mail (facultatif)<input name="email" type="email" placeholder="sinon : son téléphone" /></label>
         <label>Mot de passe provisoire<input name="motdepasse" type="text" minLength={8} required autoComplete="new-password" /></label>
         <button className="btn sm pri" type="submit" disabled={enCours}>Créer</button>
+        <Retour etat={etat} />
+      </form>
+    </details>
+  );
+}
+
+export function ModifierVendeur({ v }: { v: { id: string; nom: string; telephone: string | null; numero_celtiis: string | null; piece_identite: string | null; segment: string; login_sbin?: string | null } }) {
+  const [etat, action, enCours] = useActionState(modifierVendeur, null);
+  return (
+    <details>
+      <summary className="btn sm">Modifier</summary>
+      <form className="inline" action={action} style={{ marginTop: 8 }}>
+        <input type="hidden" name="id" value={v.id} />
+        <label>Nom et prénoms<input name="nom" required defaultValue={v.nom} /></label>
+        <label>Téléphone<input name="telephone" inputMode="tel" defaultValue={v.telephone ?? ""} /></label>
+        <label>N° Celtiis<input name="numero_celtiis" inputMode="tel" defaultValue={v.numero_celtiis ?? ""} /></label>
+        <label>Pièce d&apos;identité<input name="piece_identite" defaultValue={v.piece_identite ?? ""} /></label>
+        <label>Segment<select name="segment" defaultValue={v.segment}><option>B2C</option><option>B2B</option></select></label>
+        <label>Login SBIN<input name="login_sbin" defaultValue={v.login_sbin ?? ""} autoCapitalize="none" /></label>
+        <button className="btn sm pri" type="submit" disabled={enCours}>Enregistrer</button>
         <Retour etat={etat} />
       </form>
     </details>
