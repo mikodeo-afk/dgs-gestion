@@ -5,7 +5,7 @@
 // en écrivant ses règles dans ce dossier et en les déclarant dans REGLES_PAR_PAYS.
 
 export type FactureClient = {
-  numero: string | null; objet: string; montant_ht: number; montant_tva: number; montant_aib: number;
+  id?: string; numero: string | null; objet: string; montant_ht: number; montant_tva: number; montant_aib: number;
   date_emission: string; encaisse_le: string | null; statut: string;
 };
 export type Avoir = { numero: string | null; facture_id: string; montant_ht: number; montant_tva: number; montant_aib: number; date_avoir: string };

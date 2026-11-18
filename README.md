@@ -23,6 +23,7 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 - Contrats et congés : fins de contrat à moins de 60 jours, congés acquis (2,5 j/mois).
 
 - Agent comptable (Bénin) : chaque mois, les déclarations à faire (TVA, ITS et redevance ORTB, VPS, AIB retenu, retenue sur loyers, CNSS, acomptes et solde d'IS, états financiers, patente) calculées à partir des factures, dépenses, frais généraux et salariés déclarés, avec leur échéance, le détail du calcul, les alertes (retards, salariés non déclarés, paie non validée) et le registre des déclarations faites. Un assistant IA (clé `ANTHROPIC_API_KEY`) explique les calculs et ce qu'il faut préparer. Les règles sont dans `src/lib/fiscal/regles.ts` ; un autre pays s'ajoute au même endroit.
+- États financiers annuels (SYSCOHADA révisé, système normal) : bilan, compte de résultat et tableau des flux de trésorerie calculés à partir des données de l'application et des données de clôture saisies (capital, trésorerie au 31/12, emprunts…), contrôles (équilibre du bilan, cohérence de la trésorerie, salariés non déclarés, matériel sans valeur), notes annexes rédigées par l'agent IA, arrêté des comptes et version imprimable.
 
 À venir : l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation), l'impôt sur salaire (ITS) et les pièces jointes (photos de justificatifs).
 

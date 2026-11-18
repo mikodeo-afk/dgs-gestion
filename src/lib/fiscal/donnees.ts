@@ -22,10 +22,10 @@ export async function chargerDonnees(regles: ReglesPays, echeances: { annee: num
 
   const [params, fc, av, ff, dep, fg, paies, decl, ...sal] = await Promise.all([
     supabase.from("parametres").select("cle,valeur"),
-    supabase.from("factures_clients").select("id,numero,objet,montant_ht,montant_tva,montant_aib,date_emission,encaisse_le,statut")
+    supabase.from("factures_clients").select("id,numero,objet,montant_ht,montant_tva,montant_aib,net_a_payer,date_emission,encaisse_le,statut")
       .or(`date_emission.gte.${depuis},encaisse_le.gte.${depuis}`),
     supabase.from("avoirs_clients").select("numero,facture_id,montant_ht,montant_tva,montant_aib,date_avoir").gte("date_avoir", depuis),
-    supabase.from("factures_fournisseurs").select("fournisseur,numero,objet,montant_ht,montant_tva,montant_aib,date_reception,statut,paye_le")
+    supabase.from("factures_fournisseurs").select("fournisseur,numero,objet,montant_ht,montant_tva,montant_aib,net_a_payer,date_reception,statut,paye_le,tiers(type)")
       .or(`date_reception.gte.${depuis},paye_le.gte.${depuis}`),
     supabase.from("depenses").select("objet,montant,statut,date_depense").gte("date_depense", depuis),
     supabase.from("frais_generaux").select("mois,categorie,libelle,montant").gte("mois", depuis),
@@ -41,7 +41,7 @@ export async function chargerDonnees(regles: ReglesPays, echeances: { annee: num
     for (const k of cles) (o as Record<string, unknown>)[k as string] = Number(r[k] ?? 0);
     return o;
   };
-  const factures = (fc.data ?? []).map((f) => num(f, ["montant_ht", "montant_tva", "montant_aib"]));
+  const factures = (fc.data ?? []).map((f) => num(f, ["montant_ht", "montant_tva", "montant_aib", "net_a_payer"]));
   const statutFacture = new Map(factures.map((f) => [f.id as string, f.statut as string]));
   const salaires: Record<string, Salaire[]> = {};
   listeMois.forEach((m, i) => {
@@ -52,7 +52,10 @@ export async function chargerDonnees(regles: ReglesPays, echeances: { annee: num
     params: Object.fromEntries((params.data ?? []).map((p) => [p.cle, Number(p.valeur)])),
     facturesClients: factures as unknown as DonneesFiscales["facturesClients"],
     avoirs: (av.data ?? []).map((a) => ({ ...num(a, ["montant_ht", "montant_tva", "montant_aib"]), facture_encaissee: statutFacture.get(a.facture_id) === "Payée" })) as DonneesFiscales["avoirs"],
-    facturesFournisseurs: (ff.data ?? []).map((f) => num(f, ["montant_ht", "montant_tva", "montant_aib"])) as unknown as DonneesFiscales["facturesFournisseurs"],
+    facturesFournisseurs: (ff.data ?? []).map((f) => {
+      const t = (f as { tiers?: { type?: string } | { type?: string }[] | null }).tiers;
+      return { ...num(f, ["montant_ht", "montant_tva", "montant_aib", "net_a_payer"]), tiers_type: (Array.isArray(t) ? t[0]?.type : t?.type) ?? null };
+    }) as unknown as DonneesFiscales["facturesFournisseurs"],
     depenses: (dep.data ?? []).map((x) => num(x, ["montant"])) as unknown as DonneesFiscales["depenses"],
     fraisGeneraux: (fg.data ?? []).map((x) => num(x, ["montant"])) as unknown as DonneesFiscales["fraisGeneraux"],
     salaires,
