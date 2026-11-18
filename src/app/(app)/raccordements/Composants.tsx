@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useMemo, useRef, useState } from "react";
-import { lireDossiers, lireRapports, RUBRIQUES, type Dossier } from "@/lib/raccordement";
+import { ACTIVITES, lireDossiers, lireRapports, RUBRIQUES, type Activite, type Dossier } from "@/lib/raccordement";
 import { reduirePhoto } from "@/lib/photo";
 import {
   affecter, ajouterMembre, creerEquipe, enregistrerRapports, importerDossiers, lirePhotoDossiers, modifierEquipe,
@@ -26,7 +26,10 @@ export function SaisieRapport({ equipes }: { equipes: Option[] }) {
   const [equipe, setEquipe] = useState(equipes[0]?.id ?? "");
   const [resultats, setResultats] = useState<ResultatRapport[]>([]);
   const [enCours, setEnCours] = useState(false);
-  const rapports = useMemo(() => (texte.trim() ? lireRapports(texte) : []), [texte]);
+  const [choix, setChoix] = useState<Record<number, Activite>>({});
+  const lus = useMemo(() => (texte.trim() ? lireRapports(texte) : []), [texte]);
+  // L'activité lue dans l'en-tête peut être corrigée ligne par ligne.
+  const rapports = lus.map((r, i) => (choix[i] ? { ...r, activite: choix[i] } : r));
 
   // L'équipe nommée dans l'en-tête du message est choisie d'office.
   const nomLu = rapports[0]?.equipe;
@@ -51,17 +54,22 @@ export function SaisieRapport({ equipes }: { equipes: Option[] }) {
         </label>
       </div>
       <label style={{ display: "block" }}>Collez ici le ou les rapports reçus (message WhatsApp tel quel)
-        <textarea value={texte} onChange={(e) => { setTexte(e.target.value); setResultats([]); }} rows={8} style={{ width: "100%", fontFamily: "monospace" }}
+        <textarea value={texte} onChange={(e) => { setTexte(e.target.value); setResultats([]); setChoix({}); }} rows={8} style={{ width: "100%", fontFamily: "monospace" }}
           placeholder={"*ÉQUIPE …/DGS*\nRACCORDEMENT du 07/11/2026\nClient: …\nLigne: …\nLinéaire : 250m\nPince : 10\n…"} />
       </label>
       {rapports.length > 0 && (
         <>
           <div className="tbl">
             <table>
-              <thead><tr><th>Date</th><th>Ligne</th><th>Client</th><th>Matériel lu</th><th>À vérifier</th></tr></thead>
+              <thead><tr><th>Activité</th><th>Date</th><th>Ligne</th><th>Client</th><th>Matériel lu</th><th>À vérifier</th></tr></thead>
               <tbody>
                 {rapports.map((r, i) => (
                   <tr key={i}>
+                    <td>
+                      <select value={r.activite} onChange={(e) => setChoix((c) => ({ ...c, [i]: e.target.value as Activite }))} aria-label="Activité">
+                        {ACTIVITES.map((a) => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </td>
                     <td>{r.date ? r.date.split("-").reverse().join("/") : "—"}</td>
                     <td className="code">{r.ligne || "—"}</td>
                     <td>{r.client}</td>
@@ -79,15 +87,16 @@ export function SaisieRapport({ equipes }: { equipes: Option[] }) {
         </>
       )}
       {resultats.map((r, i) => (
-        <p key={i} className={r.ok ? "succes" : "erreur"}>Ligne {r.ligne} : {r.ok ?? r.erreur}</p>
+        <p key={i} className={r.ok ? "succes" : "erreur"}>{r.activite} · ligne {r.ligne} : {r.ok ?? r.erreur}</p>
       ))}
     </div>
   );
 }
 
 // --- Import des dossiers (Excel ou photo) ---------------------------------------
-export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
+export function ImportDossiers({ chantiers, activite: activiteDefaut }: { chantiers: Option[]; activite: Activite }) {
   const [chantier, setChantier] = useState(chantiers[0]?.id ?? "");
+  const [activite, setActivite] = useState<Activite>(activiteDefaut);
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [msg, setMsg] = useState<Etat>(null);
   const [etape, setEtape] = useState<"" | "lecture" | "import">("");
@@ -120,7 +129,7 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
 
   async function valider() {
     setEtape("import");
-    const r = await importerDossiers(chantier, dossiers.filter((d) => d.ligne));
+    const r = await importerDossiers(chantier, dossiers.filter((d) => d.ligne), activite);
     setEtape("");
     setMsg(r);
     if (r?.ok) setDossiers([]);
@@ -130,6 +139,12 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
   return (
     <div>
       <div className="inline">
+        <label>Activité
+          <select value={activite} onChange={(e) => setActivite(e.target.value as Activite)}>
+            <optgroup label="Production">{ACTIVITES.filter((a) => a !== "SAV").map((a) => <option key={a} value={a}>{a}</option>)}</optgroup>
+            <optgroup label="SAV"><option value="SAV">SAV</option></optgroup>
+          </select>
+        </label>
         <label>Chantier de raccordement
           <select value={chantier} onChange={(e) => setChantier(e.target.value)}>
             {chantiers.map((c) => <option key={c.id} value={c.id}>{c.libelle}</option>)}
@@ -163,7 +178,7 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
             </table>
           </div>
           <div className="statusline">
-            <button className="btn pri" type="button" onClick={valider} disabled={etape !== "" || !chantier}>{etape === "import" ? "Import…" : `Importer ${dossiers.length} dossier(s)`}</button>
+            <button className="btn pri" type="button" onClick={valider} disabled={etape !== "" || !chantier}>{etape === "import" ? "Import…" : `Importer ${dossiers.length} dossier(s) ${activite}`}</button>
             <button className="btn" type="button" onClick={() => setDossiers([])}>Annuler</button>
           </div>
         </>
@@ -175,7 +190,7 @@ export function ImportDossiers({ chantiers }: { chantiers: Option[] }) {
 
 // --- Liste des dossiers, affectation, échec --------------------------------------
 export type LigneDossier = {
-  id: string; client: string; ligne: string; mobile: string | null; msan: string | null; offre: string | null;
+  id: string; activite: string; client: string; ligne: string; mobile: string | null; msan: string | null; offre: string | null;
   latitude: number | null; longitude: number | null; date_demande: string | null; date_affectation: string | null;
   statut: string; equipe: string | null; realise_le: string | null; motif_echec: string | null; materiel: string; attente: number | null;
 };
@@ -217,7 +232,7 @@ export function TableDossiers({ dossiers, equipes, gere }: { dossiers: LigneDoss
             {dossiers.map((d) => (
               <tr key={d.id}>
                 {gere && <td>{(d.statut === "À affecter" || d.statut === "Affecté") && <input type="checkbox" checked={coches.has(d.id)} onChange={() => basculer(d.id)} aria-label="Cocher" />}</td>}
-                <td>{d.client}{d.mobile && <div className="note">{d.mobile}</div>}</td>
+                <td>{d.client}{d.mobile && <div className="note">{d.mobile}</div>}{d.activite !== "Raccordement" && <div><span className="pill p-info">{d.activite}</span></div>}</td>
                 <td className="code">{d.ligne}</td>
                 <td>{d.msan ?? "—"}{d.latitude != null && (
                   <div><a className="note" href={`https://www.google.com/maps?q=${d.latitude},${d.longitude}`} target="_blank" rel="noreferrer">📍 carte</a></div>
@@ -253,7 +268,20 @@ export function TableDossiers({ dossiers, equipes, gere }: { dossiers: LigneDoss
 }
 
 // --- Équipes ------------------------------------------------------------------------
-export type LigneEquipe = { id: string; nom: string; chef_id: string; chantier_id: string; actif: boolean; membres: Option[] };
+export type LigneEquipe = { id: string; nom: string; chef_id: string; chantier_id: string; actif: boolean; activites: string[]; membres: Option[] };
+
+function CasesActivites({ valeurs }: { valeurs: string[] }) {
+  return (
+    <fieldset className="inline" style={{ border: 0, padding: 0, margin: 0 }}>
+      <legend className="note">Activités de l&apos;équipe</legend>
+      {ACTIVITES.map((a) => (
+        <label key={a} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <input type="checkbox" name="activites" value={a} defaultChecked={valeurs.includes(a)} /> {a}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
 
 export function FormEquipe({ personnes, chantiers }: { personnes: Option[]; chantiers: Option[] }) {
   const [etat, action, enCours] = useActionState(creerEquipe, null);
@@ -264,6 +292,7 @@ export function FormEquipe({ personnes, chantiers }: { personnes: Option[]; chan
         <select name="chef_id" required>{personnes.map((p) => <option key={p.id} value={p.id}>{p.libelle}</option>)}</select>
       </label>
       <label>Chantier<select name="chantier_id" required>{chantiers.map((c) => <option key={c.id} value={c.id}>{c.libelle}</option>)}</select></label>
+      <CasesActivites valeurs={[...ACTIVITES]} />
       <button className="btn pri" style={{ alignSelf: "end" }} disabled={enCours}>Créer l&apos;équipe</button>
       <Retour etat={etat} />
     </form>
@@ -282,6 +311,7 @@ export function FicheEquipe({ e, personnes, chantiers }: { e: LigneEquipe; perso
         <label>Chef d&apos;équipe<select name="chef_id" defaultValue={e.chef_id}>{personnes.map((p) => <option key={p.id} value={p.id}>{p.libelle}</option>)}</select></label>
         <label>Chantier<select name="chantier_id" defaultValue={e.chantier_id}>{chantiers.map((c) => <option key={c.id} value={c.id}>{c.libelle}</option>)}</select></label>
         <label style={{ flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "end" }}><input type="checkbox" name="actif" defaultChecked={e.actif} /> Active</label>
+        <CasesActivites valeurs={e.activites} />
         <button className="btn" style={{ alignSelf: "end" }} disabled={enCours}>Enregistrer</button>
       </form>
       <Retour etat={etat} />
