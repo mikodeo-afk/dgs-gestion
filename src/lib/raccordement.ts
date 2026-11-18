@@ -16,7 +16,26 @@ export const RUBRIQUES: { cle: string; libelle: string; unite: string }[] = [
   { cle: "poteau_implante", libelle: "Poteaux implantés", unite: "pièce" },
 ];
 
+/** Branches du projet raccordement et leurs activités. */
+export const ACTIVITES = ["Raccordement", "Implantation poteaux", "Armement", "SAV"] as const;
+export type Activite = (typeof ACTIVITES)[number];
+export const BRANCHES: { cle: "production" | "sav"; libelle: string; activites: Activite[] }[] = [
+  { cle: "production", libelle: "Production", activites: ["Raccordement", "Implantation poteaux", "Armement"] },
+  { cle: "sav", libelle: "SAV", activites: ["SAV"] },
+];
+
+/** Activité annoncée dans l'en-tête du rapport (« SAV du… », « IMPLANTATION du… »), Raccordement par défaut. */
+export function activiteDeEntete(texte: string): Activite {
+  // Seules les lignes sans « Clé : valeur » comptent : « Nombre de poteaux implantés : 2 » n'est pas un en-tête.
+  const entete = texte.split("\n").filter((l) => !/^[^:]{1,60}:/.test(l.replace(/\*/g, "").trim())).map(norm).join(" ");
+  if (/\b(sav|derangement|depannage|intervention|maintenance)\b/.test(entete)) return "SAV";
+  if (/\bimplantation/.test(entete)) return "Implantation poteaux";
+  if (/\barmement/.test(entete)) return "Armement";
+  return "Raccordement";
+}
+
 export type Rapport = {
+  activite: Activite;
   equipe: string;          // nom lu dans l'en-tête (*ÉQUIPE EUGÈNE/DGS*)
   date: string;            // AAAA-MM-JJ
   client: string;
@@ -120,7 +139,7 @@ export function lireRapport(texte: string): Rapport {
   if (!ligne) alertes.push("Numéro de ligne introuvable : le rapport ne peut pas être rattaché.");
   const pos = gps(parNorm["gps client"]);
   return {
-    equipe, date, ligne,
+    activite: activiteDeEntete(texte), equipe, date, ligne,
     client: parNorm["client"] ?? "",
     mobile: (parNorm["mobile"] ?? "").replace(/\s/g, ""),
     cable: (parNorm["type de cable"] ?? parNorm["cable"] ?? "").toUpperCase().replace(/[^A-Z0-9_ -]/g, "").trim(),
@@ -135,10 +154,10 @@ export function lireRapports(texte: string): Rapport[] {
   let courant: string[] = [];
   let aDesChamps = false;
   for (const l of texte.replace(/\r/g, "").split("\n")) {
-    const debut = /^\s*\*?\s*[ÉEée]quipe\b/i.test(l) || (/^\s*\*?\s*raccordement\b/i.test(l) && aDesChamps);
+    const debut = /^\s*\*?\s*[ÉEée]quipe\b/i.test(l) || (/^\s*\*?\s*(raccordement|sav|implantation|armement|intervention|d[ée]rangement|d[ée]pannage)\b/i.test(l) && aDesChamps);
     if (debut && aDesChamps) { morceaux.push(courant.join("\n")); courant = []; aDesChamps = false; }
     courant.push(l);
-    if (/:/.test(l) && !/^\s*\*?\s*raccordement/i.test(l)) aDesChamps = true;
+    if (/:/.test(l) && !/^\s*\*?\s*(raccordement|sav|implantation|armement|intervention|d[ée]rangement|d[ée]pannage)\b/i.test(l)) aDesChamps = true;
   }
   if (courant.join("").trim()) morceaux.push(courant.join("\n"));
   return morceaux.map(lireRapport).filter((r) => r.ligne || Object.keys(r.champs).length > 2);
@@ -148,10 +167,10 @@ export function lireRapports(texte: string): Rapport[] {
 // Dossiers reçus (tableau Excel)
 // ---------------------------------------------------------------------------
 export type Dossier = {
-  client: string; ligne: string; mobile?: string; msan?: string; offre?: string;
+  client: string; ligne: string; activite?: Activite; mobile?: string; msan?: string; offre?: string;
   latitude?: number | null; longitude?: number | null; date_demande?: string; date_affectation?: string;
 };
-type ChampDossier = keyof Dossier | "gps";
+type ChampDossier = Exclude<keyof Dossier, "activite"> | "gps";
 const ENTETES: [RegExp, ChampDossier][] = [
   [/^(client|nom|nom du client|abonne|nom client|raison sociale)/, "client"],
   [/^(ligne|n ligne|numero ligne|numero de ligne|ndi|numero)/, "ligne"],

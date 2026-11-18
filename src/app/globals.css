@@ -227,3 +227,5 @@ ul.alertes{margin:0;padding:8px 8px 8px 26px;background:var(--warn-soft);border-
 .agent .bulle b{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
 .agent form.question{display:flex;flex-direction:column;gap:6px}
 .agent textarea{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:8px;font:inherit;resize:vertical;min-width:0}
+.sous-activites{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.sous-activites .pill{text-decoration:none}

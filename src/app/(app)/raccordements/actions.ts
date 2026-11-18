@@ -6,13 +6,14 @@ import { revalidatePath } from "next/cache";
 import { exigerDroit, exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { journaliser } from "@/lib/journal";
-import type { Dossier, Rapport } from "@/lib/raccordement";
+import { ACTIVITES, type Activite, type Dossier, type Rapport } from "@/lib/raccordement";
 
 type Etat = { ok?: string; erreur?: string } | null;
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
+const activitesDe = (f: FormData) => f.getAll("activites").map(String).filter((a): a is Activite => (ACTIVITES as readonly string[]).includes(a));
 
 // --- Rapports d'installation -------------------------------------------------
-export type ResultatRapport = { ligne: string; ok?: string; erreur?: string };
+export type ResultatRapport = { ligne: string; activite: string; ok?: string; erreur?: string };
 
 export async function enregistrerRapports(equipe: string, rapports: Rapport[]): Promise<ResultatRapport[]> {
   await exigerSession();
@@ -21,17 +22,17 @@ export async function enregistrerRapports(equipe: string, rapports: Rapport[]): 
   for (const r of rapports) {
     const { data, error } = await supabase.rpc("enregistrer_rapport", {
       p_equipe: equipe,
-      p_donnees: { ligne: r.ligne, client: r.client, mobile: r.mobile, date: r.date || null, cable: r.cable,
+      p_donnees: { activite: r.activite, ligne: r.ligne, client: r.client, mobile: r.mobile, date: r.date || null, cable: r.cable,
                    latitude: r.latitude, longitude: r.longitude, champs: r.champs, materiel: r.materiel },
       p_brut: r.brut,
     });
-    if (error) { out.push({ ligne: r.ligne, erreur: error.message }); continue; }
+    if (error) { out.push({ ligne: r.ligne, activite: r.activite, erreur: error.message }); continue; }
     const d = data as { deduits: number; a_regulariser: number; non_relies: number; dossier_cree: boolean };
     const morceaux = [`${d.deduits} article(s) déduit(s) du stock`];
     if (d.a_regulariser) morceaux.push(`${d.a_regulariser} à régulariser (stock du chef insuffisant)`);
     if (d.non_relies) morceaux.push(`${d.non_relies} rubrique(s) sans article relié`);
     if (d.dossier_cree) morceaux.push("dossier créé (non reçu)");
-    out.push({ ligne: r.ligne, ok: morceaux.join(", ") });
+    out.push({ ligne: r.ligne, activite: r.activite, ok: morceaux.join(", ") });
   }
   const n = out.filter((o) => o.ok).length;
   if (n) await journaliser(`a enregistré ${n} rapport(s) de raccordement`);
@@ -58,13 +59,14 @@ export async function rouvrir(id: string): Promise<Etat> {
 }
 
 // --- Dossiers -----------------------------------------------------------------
-export async function importerDossiers(chantier: string, dossiers: Dossier[]): Promise<Etat> {
+export async function importerDossiers(chantier: string, dossiers: Dossier[], activite: Activite): Promise<Etat> {
+  if (!ACTIVITES.includes(activite)) return { erreur: "Activité inconnue." };
   await exigerDroit("racc.gerer");
   const supabase = await supabaseServeur();
-  const { data, error } = await supabase.rpc("importer_dossiers", { p_chantier: chantier, p_lignes: dossiers });
+  const { data, error } = await supabase.rpc("importer_dossiers", { p_chantier: chantier, p_lignes: dossiers.map((d) => ({ ...d, activite })) });
   if (error) return { erreur: error.message };
   const r = data as { crees: number; doublons: number };
-  await journaliser(`a importé ${r.crees} dossier(s) de raccordement`);
+  await journaliser(`a importé ${r.crees} dossier(s) ${activite}`);
   revalidatePath("/raccordements");
   return { ok: `${r.crees} dossier(s) importé(s)${r.doublons ? `, ${r.doublons} déjà connu(s) ignoré(s)` : ""}.` };
 }
@@ -124,7 +126,9 @@ Recopie exactement, sans rien inventer ; laisse vide ce qui est illisible. Ignor
 export async function creerEquipe(_: Etat, f: FormData): Promise<Etat> {
   await exigerDroit("racc.gerer");
   const supabase = await supabaseServeur();
-  const { error } = await supabase.from("equipes").insert({ nom: txt(f, "nom"), chef_id: txt(f, "chef_id"), chantier_id: txt(f, "chantier_id") });
+  const activites = activitesDe(f);
+  if (!activites.length) return { erreur: "Cochez au moins une activité." };
+  const { error } = await supabase.from("equipes").insert({ nom: txt(f, "nom"), chef_id: txt(f, "chef_id"), chantier_id: txt(f, "chantier_id"), activites });
   if (error) return { erreur: error.code === "23505" ? "Une équipe porte déjà ce nom." : error.message };
   await journaliser(`a créé l'équipe de raccordement « ${txt(f, "nom")} »`);
   revalidatePath("/raccordements");
@@ -134,8 +138,10 @@ export async function creerEquipe(_: Etat, f: FormData): Promise<Etat> {
 export async function modifierEquipe(_: Etat, f: FormData): Promise<Etat> {
   await exigerDroit("racc.gerer");
   const supabase = await supabaseServeur();
+  const activites = activitesDe(f);
+  if (!activites.length) return { erreur: "Cochez au moins une activité." };
   const { error } = await supabase.from("equipes").update({
-    nom: txt(f, "nom"), chef_id: txt(f, "chef_id"), chantier_id: txt(f, "chantier_id"), actif: f.get("actif") === "on",
+    nom: txt(f, "nom"), chef_id: txt(f, "chef_id"), chantier_id: txt(f, "chantier_id"), actif: f.get("actif") === "on", activites,
   }).eq("id", txt(f, "id"));
   if (error) return { erreur: error.code === "23505" ? "Une équipe porte déjà ce nom." : error.message };
   revalidatePath("/raccordements");
