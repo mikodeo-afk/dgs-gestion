@@ -1,6 +1,7 @@
 import { exigerSession } from "@/lib/session";
 import { POSTES, VOIT_TIERS } from "@/lib/types";
 import Nav from "./Nav";
+import Installer from "@/components/Installer";
 import { changerPays } from "./pays-actions";
 
 export const dynamic = "force-dynamic";
@@ -74,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           }
         />
         <main>
-          <div className="inner">{children}</div>
+          <div className="inner"><Installer />{children}</div>
         </main>
       </div>
     </>

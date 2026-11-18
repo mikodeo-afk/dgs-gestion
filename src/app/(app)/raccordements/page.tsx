@@ -2,7 +2,7 @@ import Link from "next/link";
 import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { Kpi } from "@/components/ui";
-import { RUBRIQUES } from "@/lib/raccordement";
+import { BRANCHES, RUBRIQUES, type Activite } from "@/lib/raccordement";
 import {
   BoutonsRegulariser, Correspondance, FicheEquipe, FormEquipe, ImportDossiers, SaisieRapport, TableDossiers,
   type LigneDossier, type LigneEquipe,
@@ -14,10 +14,20 @@ export const maxDuration = 60;
 const ONGLETS = [["en-cours", "À faire"], ["realises", "Réalisés"], ["echecs", "Échecs"], ["equipes", "Équipes et matériel"]] as const;
 type Conso = { id: string; raccordement_id: string; rubrique: string; quantite: number; statut: string; note: string | null; article_id: string | null; cree_le: string };
 
-export default async function Raccordements({ searchParams }: { searchParams: Promise<{ onglet?: string }> }) {
+export default async function Raccordements({ searchParams }: { searchParams: Promise<{ onglet?: string; branche?: string; activite?: string }> }) {
   const s = await exigerSession();
   const sp = await searchParams;
   const onglet = ONGLETS.some((o) => o[0] === sp.onglet) ? sp.onglet! : "en-cours";
+  // Deux branches : Production (raccordement, implantation de poteaux, armement) et SAV.
+  const branche = BRANCHES.find((b) => b.cle === sp.branche) ?? BRANCHES[0];
+  const activite = branche.activites.find((a) => a === sp.activite) ?? null;
+  const filtre: Activite[] = activite ? [activite] : branche.activites;
+  const lien = (p: { onglet?: string; branche?: string; activite?: string | null }) => {
+    const q = new URLSearchParams({ branche: p.branche ?? branche.cle, onglet: p.onglet ?? onglet });
+    const a = p.activite === undefined ? activite : p.activite;
+    if (a) q.set("activite", a);
+    return `/raccordements?${q}`;
+  };
   const gere = s.peut("racc.gerer");
   const stock = s.peut("stock.gerer");
   const supabase = await supabaseServeur();
@@ -27,15 +37,15 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
 
   const statuts = onglet === "realises" ? ["Réalisé"] : onglet === "echecs" ? ["Échec"] : ["À affecter", "Affecté"];
   const [{ data: equipes }, { data: membres }, { data: mes }, { data: profils }, { data: chantiers }, { data: dossiers }, { data: compte }, { data: attente }] = await Promise.all([
-    supabase.from("equipes").select("id,nom,chef_id,chantier_id,actif").order("nom"),
+    supabase.from("equipes").select("id,nom,chef_id,chantier_id,actif,activites").order("nom"),
     supabase.from("equipe_membres").select("equipe_id,profil_id"),
     supabase.rpc("mes_equipes"),
     supabase.from("profils").select("id,nom,actif").order("nom"),
     supabase.from("chantiers").select("id,code,nom,statut,domaine").order("code"),
     onglet === "equipes" ? Promise.resolve({ data: [] }) : supabase.from("raccordements")
-      .select("id,client,ligne,mobile,msan,offre,latitude,longitude,date_demande,date_affectation,statut,equipe_id,realise_le,motif_echec")
-      .in("statut", statuts).order(onglet === "en-cours" ? "date_affectation" : "realise_le", { ascending: onglet === "en-cours", nullsFirst: false }).limit(500),
-    supabase.from("raccordements").select("statut,realise_le,date_affectation"),
+      .select("id,activite,client,ligne,mobile,msan,offre,latitude,longitude,date_demande,date_affectation,statut,equipe_id,realise_le,motif_echec")
+      .in("statut", statuts).in("activite", filtre).order(onglet === "en-cours" ? "date_affectation" : "realise_le", { ascending: onglet === "en-cours", nullsFirst: false }).limit(500),
+    supabase.from("raccordements").select("activite,statut,realise_le,date_affectation"),
     stock || gere ? supabase.from("consommations_raccordement").select("id,raccordement_id,rubrique,quantite,statut,note,article_id,cree_le").in("statut", ["À régulariser", "Non relié"]).order("cree_le").limit(300) : Promise.resolve({ data: [] }),
   ]);
 
@@ -64,8 +74,14 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
       .map((c) => `${libRub(c.rubrique)} ${Number(c.quantite)}${c.statut === "À régulariser" ? " ⚠" : c.statut === "Non relié" ? " (non suivi)" : ""}`).join(" · "),
   }));
 
-  const tous = compte ?? [];
+  const tousPays = compte ?? [];
+  const tous = tousPays.filter((r) => (filtre as string[]).includes(r.activite));
   const nb = (f: (r: { statut: string; realise_le: string | null; date_affectation: string | null }) => boolean) => tous.filter(f).length;
+  const parActivite = branche.activites.map((a) => ({
+    a,
+    ouverts: tousPays.filter((r) => r.activite === a && (r.statut === "À affecter" || r.statut === "Affecté")).length,
+    mois: tousPays.filter((r) => r.activite === a && r.statut === "Réalisé" && (r.realise_le ?? "") >= debutMois).length,
+  }));
   const aRegulariser = ((attente ?? []) as Conso[]).filter((c) => c.statut === "À régulariser");
   const nonRelies = ((attente ?? []) as Conso[]).filter((c) => c.statut === "Non relié");
 
@@ -82,10 +98,27 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
     <>
       <div className="head">
         <div>
-          <h1>Raccordements</h1>
+          <h1>Raccordements · {branche.libelle}</h1>
           <p className="sub">Dossiers reçus chaque jour, affectés aux équipes. Le rapport d&apos;installation envoyé par l&apos;équipe clôt le dossier et déduit le matériel posé du stock du chef d&apos;équipe.</p>
         </div>
       </div>
+      <div className="tabs" role="tablist" aria-label="Branche">
+        {BRANCHES.map((b) => (
+          <Link key={b.cle} href={lien({ branche: b.cle, activite: null })} role="tab" aria-selected={b.cle === branche.cle} className="tab">
+            {b.libelle}
+          </Link>
+        ))}
+      </div>
+      {branche.activites.length > 1 && (
+        <p className="sous-activites">
+          <Link href={lien({ activite: null })} className={`pill ${activite ? "" : "p-info"}`}>Toutes</Link>
+          {parActivite.map(({ a, ouverts, mois }) => (
+            <Link key={a} href={lien({ activite: a })} className={`pill ${activite === a ? "p-info" : ""}`}>
+              {a} · {ouverts} en cours · {mois} ce mois
+            </Link>
+          ))}
+        </p>
+      )}
       <div className="kpis">
         <Kpi libelle="À affecter" valeur={nb((r) => r.statut === "À affecter")} ton={nb((r) => r.statut === "À affecter") ? "hl" : undefined} />
         <Kpi libelle="En cours chez les équipes" valeur={nb((r) => r.statut === "Affecté")} />
@@ -103,7 +136,7 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
         <section className="panel">
           <details>
             <summary>Importer les dossiers reçus (Excel ou photo)</summary>
-            <ImportDossiers chantiers={optChantiers} />
+            <ImportDossiers key={activite ?? branche.cle} chantiers={optChantiers} activite={activite ?? branche.activites[0]} />
           </details>
         </section>
       )}
@@ -124,17 +157,18 @@ export default async function Raccordements({ searchParams }: { searchParams: Pr
         </section>
       )}
       {(stock || gere) && nonRelies.length > 0 && (
-        <p className="note">{nonRelies.length} quantité(s) déclarée(s) dans des rubriques sans article relié : voir <Link href="/raccordements?onglet=equipes">Équipes et matériel</Link>.</p>
+        <p className="note">{nonRelies.length} quantité(s) déclarée(s) dans des rubriques sans article relié : voir <Link href={lien({ onglet: "equipes" })}>Équipes et matériel</Link>.</p>
       )}
 
       <div className="tabs" role="tablist">
         {ONGLETS.filter(([k]) => k !== "equipes" || gere || stock).map(([k, v]) =>
-          <Link key={k} href={`/raccordements?onglet=${k}`} role="tab" aria-selected={onglet === k} className="tab">{v}</Link>)}
+          <Link key={k} href={lien({ onglet: k })} role="tab" aria-selected={onglet === k} className="tab">{v}</Link>)}
       </div>
 
       {onglet !== "equipes" && (
         <section className="panel">
-          <TableDossiers dossiers={lignes} equipes={lesEquipes.filter((e) => e.actif).map((e) => ({ id: e.id, libelle: e.nom }))} gere={gere} />
+          <TableDossiers dossiers={lignes}
+            equipes={lesEquipes.filter((e) => e.actif && filtre.some((a) => e.activites.includes(a))).map((e) => ({ id: e.id, libelle: e.nom }))} gere={gere} />
         </section>
       )}
 

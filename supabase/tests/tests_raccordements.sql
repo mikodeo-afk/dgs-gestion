@@ -81,3 +81,25 @@ select pg_temp.check((select statut = 'Affecté' from raccordements where ligne 
 commit;
 \echo 'Tous les tests des raccordements passent.'
 select pg_temp.check((select date_affectation = '2025-11-10' from raccordements where ligne = '121383143'), 'la seconde date est la date d''affectation');
+
+-- Branches Production / SAV : une même ligne peut avoir un dossier par activité.
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000006';
+select pg_temp.check((importer_dossiers('10000000-0000-0000-0000-000000000001', '[{"client":"BOKO HOSSOU","ligne":"121383143","activite":"SAV","date_demande":"2025-11-12"}]'::jsonb) ->> 'crees')::int = 1,
+                     'un dossier SAV est accepté sur une ligne déjà raccordée');
+select pg_temp.check(pg_temp.erreur($$select importer_dossiers('10000000-0000-0000-0000-000000000001', '[{"client":"X","ligne":"5","activite":"Peinture"}]'::jsonb)$$) like '%activité inconnue%',
+                     'activité inconnue refusée');
+select pg_temp.check((select branche = 'SAV' from raccordements where ligne = '121383143' and activite = 'SAV'), 'le dossier SAV est dans la branche SAV');
+select affecter_raccordements(array(select id from raccordements where activite = 'SAV'), '80000000-0000-0000-0000-000000000001');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000011';
+select pg_temp.check((select not (r ->> 'dossier_cree')::boolean and r ->> 'activite' = 'SAV'
+                      from (select enregistrer_rapport('80000000-0000-0000-0000-000000000001', '{"ligne":"121383143","activite":"SAV","date":"2025-11-13"}'::jsonb) r) x),
+                     'le rapport SAV clôt le dossier SAV de la ligne');
+select pg_temp.check((select (enregistrer_rapport('80000000-0000-0000-0000-000000000001', '{"ligne":"121328435","activite":"Implantation poteaux","date":"2025-11-13","materiel":{"poteau_implante":2}}'::jsonb) ->> 'dossier_cree')::boolean),
+                     'rapport d''implantation sans dossier : un dossier Production est créé');
+select pg_temp.check((select statut = 'Affecté' from raccordements where ligne = '121328435' and activite = 'Raccordement'),
+                     'le dossier de raccordement de la même ligne reste ouvert');
+select pg_temp.check((select branche = 'Production' and statut = 'Réalisé' from raccordements where ligne = '121328435' and activite = 'Implantation poteaux'),
+                     'l''implantation de poteaux est une activité de la Production');
+commit;
+\echo 'Tests des branches Production / SAV : ok.'

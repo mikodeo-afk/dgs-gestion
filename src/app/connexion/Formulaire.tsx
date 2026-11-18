@@ -2,6 +2,7 @@
 import { useActionState } from "react";
 import type { Pays } from "@/lib/types";
 import { seConnecter } from "./actions";
+import Installer from "@/components/Installer";
 
 export default function Formulaire({ inactif, pays }: { inactif: boolean; pays: Pays[] }) {
   const [etat, action, enCours] = useActionState(seConnecter, null);
@@ -13,6 +14,7 @@ export default function Formulaire({ inactif, pays }: { inactif: boolean; pays: 
         <h1>DGS Gestion</h1>
         <p className="sub">Choisissez votre pays, puis connectez-vous avec le compte créé par les RH de ce pays.</p>
       </div>
+      <Installer connexion />
       {inactif && <p className="erreur">Votre compte n&apos;est pas encore activé. Contactez le service RH.</p>}
       {etat?.erreur && <p className="erreur">{etat.erreur}</p>}
       <label>
