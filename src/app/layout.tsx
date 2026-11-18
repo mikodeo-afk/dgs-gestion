@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "DGS Gestion",
   description: "Suivi des chantiers, dépenses, finances et personnel des filiales DGS.",
+  appleWebApp: { capable: true, title: "DGS Gestion", statusBarStyle: "default" },
 };
+
+export const viewport: Viewport = { themeColor: "#01014c" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
