@@ -4,7 +4,7 @@ import { fcfa } from "@/lib/format";
 import { lireExtraction, scoreFeuille, type LigneExtraction, type Offre } from "@/lib/pvt";
 import {
   attribuerVente, basculerVendeur, creerCompteVendeur, modifierVendeur, creerVendeur, declarerVente, enregistrerVersement, importerExtraction,
-  majContrat, majEtatLigne, majMois, majOffre, rejeterNonValidees, supprimerVente, supprimerVersement, verserAvances, type Etat,
+  majContrat, majEtatLigne, extractionDefinitive, majMois, majOffre, rejeterNonValidees, supprimerVente, supprimerVersement, verserAvances, type Etat,
 } from "./actions";
 
 type Option = { id: string; nom: string };
@@ -224,19 +224,14 @@ export function SupprimerVersement({ id }: { id: string }) {
 
 // --- Suivi du mois ---------------------------------------------------------------------------------
 type M = { extraction_recue_le: string | null; facture_numero: string | null; facture_ht: number | null; facture_envoyee_le: string | null; payee_le: string | null; montant_paye: number | null; ajustement: number; ajustement_motif: string | null; note: string | null };
-export function FormMois({ mois, m, htCalcule }: { mois: string; m?: M; htCalcule: number }) {
+export function FormMois({ mois, m, cloture }: { mois: string; m?: M; cloture: boolean }) {
   const [etat, action, enCours] = useActionState(majMois, null);
   return (
     <form className="inline" action={action}>
       <input type="hidden" name="mois" value={mois} />
       <label>Extraction SBIN reçue le<input name="extraction_recue_le" type="date" defaultValue={m?.extraction_recue_le ?? ""} /></label>
-      <label>Ajustement HT (FCFA, + ou −)<input name="ajustement" type="number" defaultValue={m?.ajustement ?? 0} /></label>
+      <label>Ajustement HT (FCFA, + ou −)<input name="ajustement" type="number" defaultValue={m?.ajustement ?? 0} disabled={cloture} /></label>
       <label>Motif de l&apos;ajustement<input name="ajustement_motif" defaultValue={m?.ajustement_motif ?? ""} placeholder="ex. régularisation SBIN" /></label>
-      <label>N° de facture<input name="facture_numero" defaultValue={m?.facture_numero ?? ""} /></label>
-      <label>Montant facturé HT<input name="facture_ht" type="number" defaultValue={m?.facture_ht ?? htCalcule} /></label>
-      <label>Facture envoyée le<input name="facture_envoyee_le" type="date" defaultValue={m?.facture_envoyee_le ?? ""} /></label>
-      <label>Payée par SBIN le<input name="payee_le" type="date" defaultValue={m?.payee_le ?? ""} /></label>
-      <label>Montant reçu<input name="montant_paye" type="number" defaultValue={m?.montant_paye ?? ""} /></label>
       <label>Note<input name="note" defaultValue={m?.note ?? ""} /></label>
       <button className="btn pri" type="submit" disabled={enCours}>Enregistrer</button>
       <Retour etat={etat} />
@@ -329,12 +324,21 @@ export function FormOffre({ offre }: { offre?: Offre }) {
   );
 }
 
-export function FormContrat({ reference, debut, taux }: { reference: string; debut: string; taux: number }) {
+export function ExtractionDefinitive({ mois, libelle }: { mois: string; libelle: string }) {
+  return <Bouton action={() => extractionDefinitive(mois)} texte={libelle} classe="btn pri"
+    confirmer="Enregistrer l'extraction SBIN définitive ? Les PV de réception seront signés et transmis aux finances pour la facture, et le mois sera clôturé." />;
+}
+
+export function FormContrat({ reference, debut, taux, chantier, chantiers }: { reference: string; debut: string; taux: number; chantier?: string | null; chantiers: { id: string; libelle: string }[] }) {
   const [etat, action, enCours] = useActionState(majContrat, null);
   return (
     <form className="inline" action={action}>
       <label>Référence<input name="reference" defaultValue={reference} /></label>
       <label>Début du contrat<input name="date_debut" type="date" required defaultValue={debut} /></label>
+      <label>Projet (finances, PV, factures)<select name="chantier_id" defaultValue={chantier ?? ""} required>
+        <option value="" disabled>Choisir le projet PVT…</option>
+        {chantiers.map((c) => <option key={c.id} value={c.id}>{c.libelle}</option>)}
+      </select></label>
       <label>Avance aux vendeurs (% du point temporaire)<input name="taux_avance" type="number" min="0" max="100" step="1" defaultValue={taux} /></label>
       <button className="btn sm pri" type="submit" disabled={enCours}>Enregistrer</button>
       <Retour etat={etat} />

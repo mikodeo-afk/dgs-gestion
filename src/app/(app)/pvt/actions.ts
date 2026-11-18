@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { journaliser } from "@/lib/journal";
 import { fcfa } from "@/lib/format";
 import { identifiantVersEmail } from "@/lib/identifiant";
-import type { LigneExtraction } from "@/lib/pvt";
+import { lignesPv, moisFr, moisPrecedent, type LigneExtraction, type Offre, type Vendeur, type Vente } from "@/lib/pvt";
 
 export type Etat = { ok?: string; erreur?: string } | null;
 const txt = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -90,6 +90,31 @@ export async function rejeterNonValidees(mois: string): Promise<Etat> {
   return fini(`${data} vente(s) absente(s) de l'extraction passée(s) en rejetée(s).`);
 }
 
+/**
+ * Extraction SBIN définitive = PV de réception : crée un PV client signé par segment (FTTH, FTTO…)
+ * sur le projet PVT, que les finances facturent puis encaissent. Le mois est ensuite clôturé.
+ */
+export async function extractionDefinitive(mois: string): Promise<Etat> {
+  await exigerDroit("pvt.gerer");
+  const supabase = await supabaseServeur();
+  let debut = mois;
+  for (let i = 0; i < 6; i++) debut = moisPrecedent(debut);
+  const [{ data: contrat }, { data: offres }, { data: vendeurs }, { data: ventes }, { data: m }] = await Promise.all([
+    supabase.from("pvt_contrats").select("date_debut").maybeSingle(),
+    supabase.from("pvt_offres").select("*"),
+    supabase.from("pvt_vendeurs").select("*"),
+    supabase.from("pvt_ventes").select("*").gte("mois", debut).lte("mois", mois),
+    supabase.from("pvt_mois").select("ajustement").eq("mois", mois).maybeSingle(),
+  ]);
+  const carte = new Map(((offres ?? []) as Offre[]).map((o) => [o.id, o]));
+  const lignes = lignesPv(mois, (ventes ?? []) as Vente[], carte, (vendeurs ?? []) as Vendeur[], contrat?.date_debut ?? mois, Number(m?.ajustement ?? 0));
+  const { data, error } = await supabase.rpc("pvt_extraction_definitive", { p_mois: mois, p_lignes: lignes });
+  if (error) return { erreur: error.message };
+  const pv = data as Record<string, string>;
+  await journaliser(`a enregistré l'extraction SBIN définitive de ${moisFr(mois)} : PV ${Object.values(pv).join(", ")}`);
+  return fini(`Extraction définitive enregistrée : PV de réception ${Object.values(pv).join(" et ")} signé(s), à facturer à SBIN dans Finances.`);
+}
+
 // --- Versements aux vendeurs ------------------------------------------------------------
 export async function enregistrerVersement(_: Etat, f: FormData): Promise<Etat> {
   await exigerDroit("pvt.gerer");
@@ -133,10 +158,8 @@ export async function majMois(_: Etat, f: FormData): Promise<Etat> {
   const v = (k: string) => txt(f, k) || null;
   const { error } = await supabase.from("pvt_mois").upsert({
     pays: s.pays.code, mois: txt(f, "mois"),
-    facture_numero: v("facture_numero"), facture_ht: txt(f, "facture_ht") ? num(f, "facture_ht") : null,
-    facture_envoyee_le: v("facture_envoyee_le"), payee_le: v("payee_le"), montant_paye: txt(f, "montant_paye") ? num(f, "montant_paye") : null,
     extraction_recue_le: v("extraction_recue_le"),
-    ajustement: num(f, "ajustement"), ajustement_motif: v("ajustement_motif"), note: v("note"),
+    ...(f.has("ajustement") ? { ajustement: num(f, "ajustement"), ajustement_motif: v("ajustement_motif") } : {}), note: v("note"),
   }, { onConflict: "pays,mois" });
   if (error) return { erreur: error.message };
   return fini("Suivi du mois enregistré.");
@@ -159,7 +182,7 @@ export async function creerVendeur(_: Etat, f: FormData): Promise<Etat> {
     const { data, error } = await admin.auth.admin.createUser({ email: identifiant, password: motdepasse, email_confirm: true, user_metadata: { nom, pays: s.pays.code } });
     if (error || !data.user) return { erreur: "Le compte n'a pas été créé : " + (error?.message ?? "erreur inconnue") };
     profil = data.user.id;
-    const { error: e2 } = await admin.from("profils").update({ nom, poste: "vendeur", actif: true, telephone: txt(f, "telephone") || null, contrat: "Mandataire", responsable_id: s.profil.id }).eq("id", profil);
+    const { error: e2 } = await admin.from("profils").update({ nom, poste: "vendeur", actif: true, telephone: txt(f, "telephone") || null, contrat: "Prestation", responsable_id: s.profil.id }).eq("id", profil);
     if (e2) return { erreur: "Compte créé mais fiche incomplète : " + e2.message };
   }
   const { error } = await supabase.from("pvt_vendeurs").insert({
@@ -187,7 +210,7 @@ export async function creerCompteVendeur(_: Etat, f: FormData): Promise<Etat> {
   const admin = supabaseAdmin();
   const { data, error } = await admin.auth.admin.createUser({ email: identifiant, password: motdepasse, email_confirm: true, user_metadata: { nom: v.nom, pays: s.pays.code } });
   if (error || !data.user) return { erreur: "Le compte n'a pas été créé : " + (error?.message ?? "erreur inconnue") };
-  await admin.from("profils").update({ nom: v.nom, poste: "vendeur", actif: true, telephone: v.telephone, contrat: "Mandataire", responsable_id: s.profil.id }).eq("id", data.user.id);
+  await admin.from("profils").update({ nom: v.nom, poste: "vendeur", actif: true, telephone: v.telephone, contrat: "Prestation", responsable_id: s.profil.id }).eq("id", data.user.id);
   const { error: e2 } = await supabase.from("pvt_vendeurs").update({ profil_id: data.user.id }).eq("id", v.id);
   if (e2) return { erreur: e2.message };
   await journaliser(`a créé le compte du vendeur terrain ${v.nom}`);
@@ -239,6 +262,7 @@ export async function majContrat(_: Etat, f: FormData): Promise<Etat> {
   const supabase = await supabaseServeur();
   const { error } = await supabase.from("pvt_contrats").upsert({
     pays: s.pays.code, reference: txt(f, "reference") || "Contrat PVT", date_debut: txt(f, "date_debut"), taux_avance: num(f, "taux_avance"),
+    chantier_id: txt(f, "chantier_id") || null,
   }, { onConflict: "pays" });
   if (error) return { erreur: error.message };
   return fini("Contrat mis à jour.");

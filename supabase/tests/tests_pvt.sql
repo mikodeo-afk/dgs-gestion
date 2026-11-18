@@ -98,6 +98,43 @@ select pvt_etat_ligne((select id from pvt_ventes where ligne = '019700001'), 'Su
 select pg_temp.check(pg_temp.echoue($$select pvt_etat_ligne((select id from pvt_ventes where ligne = '019700003'), 'Active')$$), 'une vente rejetée n''a pas de statut de ligne');
 commit;
 
+-- Finances : le contrat est rattaché à un projet ; l'extraction définitive devient un PV de réception signé.
+update pvt_contrats set chantier_id = '10000000-0000-0000-0000-000000000040' where pays = 'BJ';
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000060';
+select pg_temp.check(pg_temp.echoue($$select pvt_extraction_definitive('2026-12-01', '[{"segment":"B2C","designation":"x","quantite":1,"prix":1}]')$$), 'pas d''extraction définitive sans extraction importée');
+select pg_temp.check((select r ? 'B2C' and r ? 'B2B' from pvt_extraction_definitive('2026-10-01',
+   '[{"segment":"B2C","designation":"Commission Fibre HOME 50M","unite":"vente","quantite":3,"prix":10000},
+     {"segment":"B2C","designation":"Primes vendeurs VTM","unite":"forfait","quantite":1,"prix":50000},
+     {"segment":"B2B","designation":"Commission Fibre Pro 50M","unite":"vente","quantite":2,"prix":12000}]') r),
+   'extraction définitive : un PV par segment');
+commit;
+select pg_temp.check((select p.statut = 'Signé' and p.type = 'client' and p.montant_ht = 80000 and p.chantier_id = '10000000-0000-0000-0000-000000000040'
+                      from pvt_mois m join pv_execution p on p.id = m.pv_b2c_id where m.mois = '2026-10-01'),
+                     'PV de réception FTTH signé, sur le projet PVT, 80 000 HT, prêt à facturer');
+select pg_temp.check((select count(*) from pv_lignes l join pvt_mois m on l.pv_id = m.pv_b2b_id where m.mois = '2026-10-01') = 1, 'le PV détaille les lignes');
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000060';
+select pg_temp.check(pg_temp.echoue($$select pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"0129999999","offre":"FTTH_Home_50M"}]')$$), 'mois clôturé : plus d''import');
+select pg_temp.check(pg_temp.echoue($$select pvt_extraction_definitive('2026-10-01', '[{"segment":"B2C","designation":"x","quantite":1,"prix":1}]')$$), 'pas deux fois');
+select pvt_etat_ligne((select id from pvt_ventes where ligne = '019700002'), 'Active');
+select pg_temp.check(true, 'mois clôturé : l''état des lignes se met encore à jour');
+insert into pvt_versements (mois, vendeur_id, type, montant, verse_le, mode) values ('2026-10-01', '70000000-0000-0000-0000-000000000001', 'Solde', 30000, '2026-11-20', 'Mobile Money');
+commit;
+select pg_temp.check((select d.statut = 'Payée' and d.montant = 30000 and d.chantier_id = '10000000-0000-0000-0000-000000000040'
+                      from pvt_versements v join depenses d on d.id = v.depense_id where v.montant = 30000),
+                     'le versement au vendeur est une dépense payée du projet');
+update pv_execution set statut = 'Annulé' where id = (select pv_b2c_id from pvt_mois where mois = '2026-10-01');
+select pg_temp.check((select not cloture and pv_b2c_id is null from pvt_mois where mois = '2026-10-01'), 'annuler le PV rouvre le mois');
+
+-- Superviseur PVT et contrat de prestation.
+insert into auth.users (id,email,raw_user_meta_data) values ('00000000-0000-0000-0000-000000000062','superviseur@dgs.bj','{"nom":"Koffi Superviseur","pays":"BJ"}');
+update profils set actif=true, poste='superviseur', contrat='Prestation' where id='00000000-0000-0000-0000-000000000062';
+select pg_temp.check((select contrat from profils where id='00000000-0000-0000-0000-000000000062') = 'Prestation', 'contrat de prestation accepté');
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000062';
+select pg_temp.check(a_droit('pvt.gerer') and a_droit('pointer') and not est_global(), 'le superviseur gère les ventes terrain, pointe, sans vue globale');
+select pg_temp.check((select array_agg(x) from mes_chantiers() x) = array['10000000-0000-0000-0000-000000000040'::uuid], 'son projet est le projet PVT');
+select pg_temp.check((select count(*) from pvt_ventes) > 0, 'il voit les ventes terrain');
+commit;
+
 -- Isolement par pays : un compte du Mali ne voit rien.
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000001';
 select pg_temp.check((select count(*) from pvt_ventes) = 0 and (select count(*) from pvt_offres) = 0, 'le Mali ne voit pas les ventes terrain du Bénin');

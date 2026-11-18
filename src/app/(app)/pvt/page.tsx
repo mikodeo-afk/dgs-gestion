@@ -9,7 +9,7 @@ import {
   type Facture, type Mois, type Offre, type Vendeur, type Vente, type Versement,
 } from "@/lib/pvt";
 import {
-  Attribuer, BasculerVendeur, CompteVendeur, ModifierVendeur, EtatLigne, FormContrat, FormMois, FormOffre, FormVendeur, FormVente, FormVersement,
+  Attribuer, BasculerVendeur, CompteVendeur, ExtractionDefinitive, ModifierVendeur, EtatLigne, FormContrat, FormMois, FormOffre, FormVendeur, FormVente, FormVersement,
   ImportExtraction, SupprimerVente, SupprimerVersement, VerserAvances,
 } from "./Composants";
 
@@ -41,6 +41,19 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
   const ventes = (ventesB ?? []) as Vente[];
   const versements = (versB ?? []) as Versement[];
   const m = (moisB ?? undefined) as Mois | undefined;
+  const pvIds = [m?.pv_b2c_id, m?.pv_b2b_id].filter(Boolean) as string[];
+  const [{ data: chantiersB }, { data: pvsB }, { data: facturesB }] = await Promise.all([
+    gere ? supabase.from("chantiers").select("id,code,nom").order("code") : Promise.resolve({ data: [] as { id: string; code: string; nom: string }[] }),
+    pvIds.length ? supabase.from("pv_execution").select("id,numero,statut,montant_ht").in("id", pvIds) : Promise.resolve({ data: [] as { id: string; numero: string; statut: string; montant_ht: number }[] }),
+    pvIds.length ? supabase.from("factures_clients").select("id,numero,statut,montant_ht,date_emission,encaisse_le,pv_id").in("pv_id", pvIds).neq("statut", "Annulée") : Promise.resolve({ data: [] as { id: string; numero: string; statut: string; montant_ht: number; date_emission: string; encaisse_le: string | null; pv_id: string }[] }),
+  ]);
+  const pvs = pvsB ?? [];
+  const factures = facturesB ?? [];
+  const suivi = m ? {
+    ...m,
+    facture_envoyee_le: factures.length ? factures.map((f) => f.date_emission).sort()[0] : null,
+    payee_le: factures.length && factures.length === pvIds.length && factures.every((f) => f.statut === "Payée") ? factures.map((f) => f.encaisse_le ?? "").sort().reverse()[0] || null : null,
+  } : undefined;
   const tauxAvance = Number(contrat?.taux_avance ?? 50);
   const debutContrat = contrat?.date_debut ?? "2026-07-31";
   const estVendeur = !voitTout;
@@ -61,7 +74,7 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
       <>
         <div className="head"><div><h1>Ventes terrain</h1></div></div>
         <section className="panel"><p className="note">Aucun contrat de ventes terrain dans ce pays. Le suivi est configuré pour le contrat PVT Celtiis (SBIN) du Bénin.</p>
-          {gere && <FormContrat reference="Contrat PVT" debut={aujourdhui()} taux={50} />}</section>
+          {gere && <FormContrat reference="Contrat PVT" debut={aujourdhui()} taux={50} chantiers={(chantiersB ?? []).map((c) => ({ id: c.id, libelle: `${c.code} · ${c.nom}` }))} />}</section>
       </>
     );
   }
@@ -149,7 +162,7 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
           </section>
 
           <section className="panel">
-            <h2>Extraction SBIN et facture</h2>
+            <h2>Extraction SBIN, PV de réception et facture</h2>
             {gere && <ImportExtraction mois={mois} offres={offresL} declarees={nb("Déclarée")} />}
             <div className="tbl">
               <table>
@@ -180,14 +193,36 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
                 </tbody>
               </table>
             </div>
-            {gere && <FormMois mois={mois} m={m} htCalcule={fac.ht} />}
+            <h3>PV de réception et facture</h3>
+            {m?.cloture ? (
+              <div className="tbl"><table>
+                <thead><tr><th>PV de réception</th><th className="num">Montant HT</th><th>Facture</th><th>Encaissement</th></tr></thead>
+                <tbody>{pvIds.map((id) => {
+                  const p = pvs.find((x) => x.id === id);
+                  const f = factures.find((x) => x.pv_id === id);
+                  return (
+                    <tr key={id}>
+                      <td>{p ? <Link href={`/pv/${id}`} className="code">{p.numero}</Link> : "PV"} {id === m.pv_b2c_id ? "FTTH (B2C)" : "FTTO et B2B"}</td>
+                      <td className="num">{p ? fcfa(p.montant_ht) : "—"}</td>
+                      <td>{f ? <Link href={`/finances/facture/${f.id}`} className="code">{f.numero}</Link> : <Pastille texte="À facturer (Finances)" ton="warn" />}</td>
+                      <td>{f?.statut === "Payée" ? <Pastille texte={`Encaissée le ${dateFr(f.encaisse_le)}`} ton="ok" /> : f ? <Pastille texte="En attente du paiement SBIN" ton="warn" /> : "—"}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table></div>
+            ) : (
+              <p className="note">Quand l&apos;extraction SBIN du mois est définitive, enregistrez-la : elle vaut PV de réception. Un PV signé est créé par segment sur le projet {contrat?.chantier_id ? "PVT" : "(à choisir dans « Offres et contrat »)"}, les Finances établissent la facture à SBIN puis enregistrent l&apos;encaissement. Le mois est alors clôturé.</p>
+            )}
+            {gere && !m?.cloture && m?.extraction_recue_le && fac.ht > 0 && <ExtractionDefinitive mois={mois} libelle={`Enregistrer l'extraction définitive (${fcfa(fac.ht)} FCFA HT)`} />}
+            {m?.cloture && <p className="note">Mois clôturé le {dateFr(m.definitive_le)} : les ventes ne changent plus (sauf le statut des lignes). Pour corriger, annulez le PV (et sa facture) dans PV d&apos;exécution : le mois se rouvre.</p>}
+            {gere && <FormMois mois={mois} m={m} cloture={Boolean(m?.cloture)} />}
           </section>
 
           <section className="panel">
             <h2>Échéances de {moisFr(mois)}</h2>
             <div className="tbl"><table>
               <thead><tr><th>Étape</th><th>Quand</th><th>État</th></tr></thead>
-              <tbody>{echeances(mois, m).map((e) => {
+              <tbody>{echeances(mois, suivi).map((e) => {
                 const retard = !e.fait && e.au && e.au < aujourdhui();
                 return (
                   <tr key={e.libelle}><td>{e.libelle}</td>
@@ -293,7 +328,7 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
       {onglet === "offres" && !estVendeur && (
         <section className="panel">
           <h2>Contrat</h2>
-          {gere ? <FormContrat reference={contrat?.reference ?? ""} debut={debutContrat} taux={tauxAvance} />
+          {gere ? <FormContrat reference={contrat?.reference ?? ""} debut={debutContrat} taux={tauxAvance} chantier={contrat?.chantier_id} chantiers={(chantiersB ?? []).map((c) => ({ id: c.id, libelle: `${c.code} · ${c.nom}` }))} />
             : <p>{contrat?.reference} · depuis le {dateFr(debutContrat)} · avance {tauxAvance} %</p>}
           <h2>Grille des commissions (annexe 3)</h2>
           <div className="tbl">

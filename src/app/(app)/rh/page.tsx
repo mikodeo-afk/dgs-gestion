@@ -285,7 +285,7 @@ export default async function RH({ searchParams }: { searchParams: Promise<{ ong
                     <td>{u.contrat}</td>
                     <td className="num">{dateFr(u.date_embauche)}</td>
                     <td className="num">{dateFr(u.date_fin)}{bientot.includes(u) && <><br /><Pastille texte="Fin dans moins de 60 j" ton="warn" /></>}</td>
-                    <td className="num">{u.contrat === "Mandataire" ? "—" : `${(moisDepuis(u.date_embauche) * 2.5).toFixed(1).replace(".", ",")} j`}</td>
+                    <td className="num">{["Mandataire", "Prestation"].includes(u.contrat) ? "—" : `${(moisDepuis(u.date_embauche) * 2.5).toFixed(1).replace(".", ",")} j`}</td>
                   </tr>
                 ))}
               </tbody>

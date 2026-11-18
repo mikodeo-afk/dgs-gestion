@@ -97,7 +97,7 @@ export default async function Personnel() {
                           {responsables.filter((r) => r.id !== p.id).map((r) => <option key={r.id} value={r.id}>{r.nom}</option>)}
                         </select>
                         <select name="contrat" defaultValue={p.contrat} aria-label={`Contrat de ${p.nom}`}>
-                          {["CDI", "CDD", "Stage", "Journalier", "Mandataire"].map((c) => <option key={c}>{c}</option>)}
+                          {["CDI", "CDD", "Stage", "Journalier", "Mandataire", "Prestation"].map((c) => <option key={c}>{c}</option>)}
                         </select>
                         <input name="date_fin" type="date" defaultValue={p.date_fin ?? ""} aria-label={`Fin de contrat de ${p.nom}`} />
                         {voitSal && <input name="salaire" type="number" min="0" step="1000" defaultValue={sal.get(p.id) ?? 0} aria-label={`Salaire de ${p.nom}`} style={{ width: 110 }} />}
