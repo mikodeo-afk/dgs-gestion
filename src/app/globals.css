@@ -248,3 +248,6 @@ table.etat tr.tot td{font-weight:700;background:var(--surface2)}
 }
 .sous-activites{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .sous-activites .pill{text-decoration:none}
+
+/* Ventes terrain : statut de ligne à renseigner */
+select.a-renseigner{border-color:var(--warn,#b7791f);background:#fff8e6}

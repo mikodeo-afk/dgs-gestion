@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { POSTES, type Chantier, type Tache } from "@/lib/types";
@@ -6,6 +7,7 @@ import { Barre, Kpi, Pastille } from "@/components/ui";
 
 export default async function TableauDeBord() {
   const s = await exigerSession();
+  if (s.profil.poste === "vendeur") redirect("/pvt");
   const supabase = await supabaseServeur();
   const auj = aujourdhui();
   const [{ data: chantiers }, { data: avancement }, { data: taches }, { data: journal }, { data: profils }] = await Promise.all([

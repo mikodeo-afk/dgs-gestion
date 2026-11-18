@@ -1,4 +1,4 @@
-export type Poste = "pdg" | "do" | "rt" | "raf" | "rh" | "compta" | "commercial" | "rla" | "cp" | "ce" | "tech";
+export type Poste = "pdg" | "do" | "rt" | "raf" | "rh" | "compta" | "commercial" | "rla" | "cp" | "ce" | "tech" | "vendeur";
 
 export const POSTES: Record<Poste, { nom: string; court: string }> = {
   pdg: { nom: "PDG / Directeur Général", court: "PDG" },
@@ -12,10 +12,11 @@ export const POSTES: Record<Poste, { nom: string; court: string }> = {
   cp: { nom: "Chef de projet", court: "Chef de projet" },
   ce: { nom: "Chef d'équipe", court: "Chef d'équipe" },
   tech: { nom: "Technicien", court: "Technicien" },
+  vendeur: { nom: "Vendeur terrain (Celtiis)", court: "Vendeur" },
 };
-export const ORDRE_POSTES: Poste[] = ["pdg", "do", "rt", "raf", "rh", "compta", "commercial", "rla", "cp", "ce", "tech"];
-export const POSTES_TERRAIN: Poste[] = ["cp", "ce", "tech"];
-export const PERIMETRE: Partial<Record<Poste, string>> = { cp: "ses chantiers", ce: "son équipe", tech: "lui-même" };
+export const ORDRE_POSTES: Poste[] = ["pdg", "do", "rt", "raf", "rh", "compta", "commercial", "rla", "cp", "ce", "tech", "vendeur"];
+export const POSTES_TERRAIN: Poste[] = ["cp", "ce", "tech", "vendeur"];
+export const PERIMETRE: Partial<Record<Poste, string>> = { cp: "ses chantiers", ce: "son équipe", tech: "lui-même", vendeur: "ses ventes" };
 
 export type Profil = {
   id: string;
