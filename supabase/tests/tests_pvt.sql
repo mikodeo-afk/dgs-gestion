@@ -15,7 +15,7 @@ update profils set actif=true, poste='commercial' where id='00000000-0000-0000-0
 update profils set actif=true, poste='vendeur' where id='00000000-0000-0000-0000-000000000061';
 
 select pg_temp.check((select count(*) from pvt_offres where pays='BJ') = 27, 'la grille de l''annexe 3 est chargée pour le Bénin');
-select pg_temp.check((select part_partenaire from pvt_offres where pays='BJ' and code='HOME50') = 2000, 'HOME 50M : 8 000 au vendeur, 2 000 au partenaire');
+select pg_temp.check((select part_partenaire from pvt_offres where pays='BJ' and code='FTTH_Home_50M') = 2000, 'HOME 50M : 8 000 au vendeur, 2 000 au partenaire');
 select pg_temp.check(not exists (select 1 from pvt_offres where pays='ML'), 'pas de grille Celtiis au Mali');
 
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000060';
@@ -23,12 +23,12 @@ insert into pvt_vendeurs (id, nom, numero_celtiis) values ('70000000-0000-0000-0
 insert into pvt_vendeurs (id, nom, profil_id) values ('70000000-0000-0000-0000-000000000002', 'Sèna Vendeur', '00000000-0000-0000-0000-000000000061');
 insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, client, ligne)
 select '2026-10-01', '2026-10-12', '70000000-0000-0000-0000-000000000001', id, 'Client ' || g, '01970000' || g
-  from pvt_offres, generate_series(1, 3) g where code = 'HOME50';
+  from pvt_offres, generate_series(1, 3) g where code = 'FTTH_Home_50M';
 select pg_temp.check((select pays from pvt_ventes limit 1) = 'BJ', 'une vente prend le pays courant');
-select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne, statut) select '2026-10-01', '2026-10-12', '70000000-0000-0000-0000-000000000001', id, '0197999999', 'Validée' from pvt_offres where code='HOME50'$$) = false,
+select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne, statut) select '2026-10-01', '2026-10-12', '70000000-0000-0000-0000-000000000001', id, '0197999999', 'Validée' from pvt_offres where code='FTTH_Home_50M'$$) = false,
                      'le commercial (gestion) peut tout enregistrer');
 delete from pvt_ventes where ligne = '0197999999';
-select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne) select '2026-10-01', '2026-10-13', '70000000-0000-0000-0000-000000000001', id, '019700001' from pvt_offres where code='HOME50'$$),
+select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne) select '2026-10-01', '2026-10-13', '70000000-0000-0000-0000-000000000001', id, '019700001' from pvt_offres where code='FTTH_Home_50M'$$),
                      'une même ligne n''est pas déclarée deux fois');
 commit;
 
@@ -37,16 +37,16 @@ begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0
 select pg_temp.check(not est_global() and (select count(*) from mes_chantiers()) = 0, 'le vendeur terrain n''a pas de vue globale ni de chantier');
 select pg_temp.check(a_droit('pvt.declarer') and not a_droit('pvt.voir'), 'le vendeur déclare ses ventes sans voir celles des autres');
 insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, client, ligne)
-select '2026-10-01', '2026-10-20', '70000000-0000-0000-0000-000000000002', id, 'Boutique', '0196000001' from pvt_offres where code='PRO25';
-select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne) select '2026-10-01', '2026-10-20', '70000000-0000-0000-0000-000000000001', id, '0196000002' from pvt_offres where code='PRO25'$$),
+select '2026-10-01', '2026-10-20', '70000000-0000-0000-0000-000000000002', id, 'Boutique', '0196000001' from pvt_offres where code='FTTH_PRO_50M';
+select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne) select '2026-10-01', '2026-10-20', '70000000-0000-0000-0000-000000000001', id, '0196000002' from pvt_offres where code='FTTH_PRO_50M'$$),
                      'un vendeur ne déclare pas pour un autre');
-select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne, statut) select '2026-10-01', '2026-10-20', '70000000-0000-0000-0000-000000000002', id, '0196000003', 'Validée' from pvt_offres where code='PRO25'$$),
+select pg_temp.check(pg_temp.echoue($$insert into pvt_ventes (mois, date_vente, vendeur_id, offre_id, ligne, statut) select '2026-10-01', '2026-10-20', '70000000-0000-0000-0000-000000000002', id, '0196000003', 'Validée' from pvt_offres where code='FTTH_PRO_50M'$$),
                      'un vendeur ne valide pas sa vente');
 select pg_temp.check((select count(*) from pvt_ventes) = 1, 'le vendeur ne voit que ses ventes');
 select pg_temp.check(pg_temp.echoue($$update pvt_ventes set statut = 'Validée'$$), 'le vendeur ne peut pas passer sa vente en validée');
 update pvt_ventes set client = 'Boutique Akpakpa';
 select pg_temp.check((select client from pvt_ventes) = 'Boutique Akpakpa', 'il corrige sa vente encore déclarée');
-select pg_temp.check(pg_temp.echoue($$select pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"0196000001","offre":"PRO25"}]')$$), 'le vendeur n''importe pas l''extraction');
+select pg_temp.check(pg_temp.echoue($$select pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"0196000001","offre":"FTTH_PRO_50M"}]')$$), 'le vendeur n''importe pas l''extraction');
 commit;
 
 -- Le RAF du Bénin voit mais ne gère pas.
@@ -59,18 +59,31 @@ commit;
 -- Extraction SBIN : rapprochement ligne à ligne.
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000060';
 insert into pvt_versements (mois, vendeur_id, type, montant, verse_le) values ('2026-10-01', '70000000-0000-0000-0000-000000000001', 'Avance', 12000, '2026-10-31');
-select pg_temp.check((select r = '{"ajoutees": 1, "validees": 3, "codes_inconnus": ["XYZ"], "offres_inconnues": 1}'::jsonb
-                      from pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"019700001","offre":"HOME50","date":"2026-10-14"},
-                                                                     {"ligne":"019700002","offre":"home100"},
-                                                                     {"ligne":"0196000001","offre":"PRO25"},
+select pg_temp.check((select r = '{"ajoutees": 1, "validees": 4, "rejetees": 0, "reportees": 0, "vendeurs_crees": 0, "codes_inconnus": ["XYZ"], "offres_inconnues": 1}'::jsonb
+                      from pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"019700001","offre":"FTTH_Home_50M","date":"2026-10-14"},
+                                                                     {"ligne":"019700002","offre":"ftth_home_100m"},
+                                                                     {"ligne":"0196000001","offre":"FTTH_PRO_50M"},
                                                                      {"ligne":"0195555555","offre":"FWA"},
                                                                      {"ligne":"0195555556","offre":"XYZ"}]') r),
-                     'extraction : 3 ventes validées, 1 ligne SBIN non déclarée ajoutée, 1 offre inconnue signalée');
-select pg_temp.check((select o.code from pvt_ventes v join pvt_offres o on o.id = v.offre_id where v.ligne = '019700002') = 'HOME100', 'l''offre retenue est celle de SBIN');
+                     'extraction : 4 ventes validées dont 1 ligne SBIN non déclarée ajoutée, 1 offre inconnue signalée');
+select pg_temp.check((select o.code from pvt_ventes v join pvt_offres o on o.id = v.offre_id where v.ligne = '019700002') = 'FTTH_Home_100M', 'l''offre retenue est celle de SBIN');
 select pg_temp.check((select vendeur_id is null and source = 'Extraction SBIN' from pvt_ventes where ligne = '0195555555'), 'la ligne SBIN non déclarée est à attribuer');
-select pg_temp.check((select (r ->> 'validees')::int = 0 and (r ->> 'ajoutees')::int = 0 from pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"019700001","offre":"HOME50"}]') r),
+select pg_temp.check((select (r ->> 'validees')::int = 0 and (r ->> 'ajoutees')::int = 0 from pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"019700001","offre":"FTTH_Home_50M"}]') r),
                      'réimporter l''extraction ne double rien');
 select pg_temp.check(pvt_rejeter_non_validees('2026-10-01') = 1, 'la vente absente de l''extraction est rejetée');
+-- Format réel SBIN : login vendeur, paiement reporté, vente non validée, arriéré, état de la ligne.
+select pg_temp.check((select r ->> 'vendeurs_crees' = '2' and r ->> 'reportees' = '1' and r ->> 'rejetees' = '1' and r ->> 'validees' = '2'
+                      from pvt_rapprocher_extraction('2026-10-01', '[{"ligne":"0121251924","offre":"FTTH_Home_50M","login":"pvt_dgs_alucresse.ftth","statut":"Validée","client":"SELOME"},
+                                                                     {"ligne":"121296069","offre":"FIBRE_PRO_MAX_100M","login":"pvt_dgs_alucresse","statut":"Validée","etat":"Active"},
+                                                                     {"ligne":"0121250000","offre":"FTTH_Home_50M","login":"pvt_dgs_alucresse.ftth","statut":"Reportée","motif":"ZONE DEPOURVUE","date":"2026-10-20"},
+                                                                     {"ligne":"0121250001","offre":"FTTH_Home_50M","login":"pvt_dgs_gadanle.ftth","statut":"Rejetée"}]') r),
+                     'extraction SBIN : vendeurs créés d''après son login, ventes validées, reportée et rejetée');
+select pg_temp.check((select count(*) from pvt_vendeurs where login_sbin = 'pvt_dgs_alucresse') = 1, 'le même login B2B et B2C (.ftth) désigne un seul vendeur');
+select pg_temp.check((select statut = 'Reportée' and motif = 'ZONE DEPOURVUE' and mois = '2026-10-01' from pvt_ventes where ligne = '0121250000'), 'la vente reportée reste ouverte avec son motif');
+select pg_temp.check((select etat_ligne from pvt_ventes where ligne = '121296069') = 'Active', 'l''état de la ligne SBIN est repris');
+select pg_temp.check((select r ->> 'validees' = '1' from pvt_rapprocher_extraction('2026-11-01', '[{"ligne":"0121250000","offre":"FTTH_Home_50M","login":"pvt_dgs_alucresse.ftth","statut":"Validée"}]') r), 'arriéré : validé');
+select pg_temp.check((select statut = 'Validée' and mois = '2026-11-01' and motif is null from pvt_ventes where ligne = '0121250000'),
+                     'l''arriéré payé le mois suivant est compté dans ce mois-là');
 select pg_temp.check((select extraction_recue_le is not null from pvt_mois where mois = '2026-10-01'), 'la réception de l''extraction est notée');
 commit;
 
