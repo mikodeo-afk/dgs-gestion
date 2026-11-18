@@ -125,6 +125,15 @@ select pg_temp.check((select d.statut = 'Payée' and d.montant = 30000 and d.cha
 update pv_execution set statut = 'Annulé' where id = (select pv_b2c_id from pvt_mois where mois = '2026-10-01');
 select pg_temp.check((select not cloture and pv_b2c_id is null from pvt_mois where mois = '2026-10-01'), 'annuler le PV rouvre le mois');
 
+-- Prévisionnel : le 1er du mois suivant, les ventes déclarées sont figées et l'avance calculée.
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000060';
+select pg_temp.check(pvt_figer_previsionnel('2026-10-01'), 'prévisionnel d''octobre figé après le 1er novembre');
+select pg_temp.check((select avance = round(part * 0.5) and ventes > 0 from pvt_previsionnel where vendeur_id = '70000000-0000-0000-0000-000000000001'), 'avance = 50 % de la part du prévisionnel');
+select pvt_figer_previsionnel('2026-10-01');
+select pg_temp.check((select count(*) from pvt_previsionnel where mois = '2026-10-01') = (select count(distinct vendeur_id) from pvt_previsionnel where mois = '2026-10-01'), 'figé une seule fois');
+select pg_temp.check(not pvt_figer_previsionnel((date_trunc('month', current_date))::date), 'le mois en cours n''est pas encore figé');
+commit;
+
 -- Superviseur PVT et contrat de prestation.
 insert into auth.users (id,email,raw_user_meta_data) values ('00000000-0000-0000-0000-000000000062','superviseur@dgs.bj','{"nom":"Koffi Superviseur","pays":"BJ"}');
 update profils set actif=true, poste='superviseur', contrat='Prestation' where id='00000000-0000-0000-0000-000000000062';

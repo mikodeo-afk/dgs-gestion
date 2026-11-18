@@ -6,7 +6,7 @@ import { aujourdhui, dateFr, fcfa } from "@/lib/format";
 import { Kpi, Pastille } from "@/components/ui";
 import {
   echeances, factureSbin, fenetreAvance, moisFr, moisPrecedent, moisSuivant, parVendeur, retention,
-  type Facture, type Mois, type Offre, type Vendeur, type Vente, type Versement,
+  type Facture, type Mois, type Previsionnel, type Offre, type Vendeur, type Vente, type Versement,
 } from "@/lib/pvt";
 import {
   Attribuer, BasculerVendeur, CompteVendeur, ExtractionDefinitive, ModifierVendeur, EtatLigne, FormContrat, FormMois, FormOffre, FormVendeur, FormVente, FormVersement,
@@ -25,6 +25,10 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
   const voitTout = gere || s.peut("pvt.voir") || s.peut("pvt.saisir");
   const debutHisto = moisPrecedent(moisPrecedent(moisPrecedent(moisPrecedent(moisPrecedent(moisPrecedent(mois))))));
 
+  // Le 1er du mois suivant, les ventes déclarées deviennent le prévisionnel figé des avances.
+  await supabase.rpc("pvt_figer_previsionnel", { p_mois: mois });
+  const { data: prevB } = await supabase.from("pvt_previsionnel").select("vendeur_id,ventes,part,taux,avance,fige_le").eq("mois", mois);
+  const previsionnel = (prevB ?? []) as (Previsionnel & { fige_le: string })[];
   const [{ data: contrat }, { data: offresB }, { data: vendeursB }, { data: ventesB }, { data: versB }, { data: moisB }, taux] = await Promise.all([
     supabase.from("pvt_contrats").select("*").maybeSingle(),
     supabase.from("pvt_offres").select("*").order("ordre"),
@@ -60,7 +64,7 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
   const moi = vendeurs.find((v) => v.profil_id === s.profil.id);
 
   const duMois = ventes.filter((v) => v.mois === mois);
-  const lignesV = parVendeur(mois, vendeurs.filter((v) => v.actif || duMois.some((x) => x.vendeur_id === v.id)), ventes, offres, versements, tauxAvance);
+  const lignesV = parVendeur(mois, vendeurs.filter((v) => v.actif || duMois.some((x) => x.vendeur_id === v.id) || previsionnel.some((p) => p.vendeur_id === v.id)), ventes, offres, versements, tauxAvance, previsionnel);
   const fac = factureSbin(mois, ventes, offres, vendeurs, debutContrat, Number(m?.ajustement ?? 0), taux.tva);
   const ret = retention(mois, ventes, offres);
   const fen = fenetreAvance(mois);
@@ -122,12 +126,15 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
         <>
           <section className="panel">
             <h2>Vendeurs : avance et solde</h2>
+            <p className="note">{previsionnel.length
+              ? `Prévisionnel figé le ${dateFr(previsionnel[0].fige_le.slice(0, 10))} : ventes déclarées par les commerciaux pour ${moisFr(mois)}, avance de ${previsionnel[0].taux} % de leur part.`
+              : `Prévisionnel en cours : il sera figé automatiquement le ${dateFr(moisSuivant(mois))} avec les ventes déclarées à cette date, et l'avance (${tauxAvance} %) calculée dessus.`}</p>
             <div className="tbl">
               <table>
-                <thead><tr><th>Vendeur</th><th className="num">Déclarées</th><th className="num">Validées</th><th className="num">Part sur le déclaré</th><th className="num">Avance ({tauxAvance} %)</th>
+                <thead><tr><th>Vendeur</th><th className="num">Déclarées</th><th className="num">Validées</th><th className="num">Prévisionnel (part vendeur)</th><th className="num">Avance ({tauxAvance} %)</th>
                   <th className="num">Part validée</th><th className="num">Prime VTM / VTB</th><th className="num">Transport</th><th className="num">Bonus rétention</th><th className="num">Déjà versé</th><th className="num">Reste dû</th></tr></thead>
                 <tbody>
-                  {lignesV.filter((l) => l.declarees || l.validees || l.avancesVersees || l.bonusRetention).map((l) => (
+                  {lignesV.filter((l) => l.declarees || l.validees || l.avancesVersees || l.bonusRetention || l.previsionnel).map((l) => (
                     <tr key={l.vendeur.id}>
                       <td>{l.vendeur.nom}{l.avanceHorsFenetre && <><br /><Pastille texte="Avance hors période 30→05" ton="warn" /></>}</td>
                       <td className="num">{l.declarees}</td><td className="num">{l.validees}{l.reportees > 0 && <span className="note"> ({l.reportees} rep.)</span>}{l.rejetees > 0 && <span className="note"> ({l.rejetees} rej.)</span>}</td>

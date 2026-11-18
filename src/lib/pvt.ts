@@ -109,12 +109,18 @@ export type LigneVendeur = {
   vendeur: Vendeur; declarees: number; validees: number; rejetees: number;
   partDeclaree: number; partValidee: number; vtm: number; vtb: number; transport: number; bonusRetention: number; reportees: number;
   avanceCalculee: number; avancesVersees: number; soldesVerses: number; du: number; avanceHorsFenetre: boolean;
+  previsionnel: boolean;
 };
+export type Previsionnel = { vendeur_id: string; ventes: number; part: number; taux: number; avance: number };
 
-/** Ce qui revient à chaque vendeur pour un mois, et ce qu'on lui a déjà versé. */
-export function parVendeur(mois: string, vendeurs: Vendeur[], ventes: Vente[], offres: Map<string, Offre>, versements: Versement[], tauxAvance: number): LigneVendeur[] {
+/**
+ * Ce qui revient à chaque vendeur pour un mois, et ce qu'on lui a déjà versé.
+ * À partir du 1er du mois suivant, l'avance vient du prévisionnel figé (ventes déclarées à cette date).
+ */
+export function parVendeur(mois: string, vendeurs: Vendeur[], ventes: Vente[], offres: Map<string, Offre>, versements: Versement[], tauxAvance: number, previsionnel: Previsionnel[] = []): LigneVendeur[] {
   const fen = fenetreAvance(mois);
   const ret = retention(mois, ventes, offres);
+  const fige = previsionnel.length > 0;
   return vendeurs.map((v) => {
     const siennes = ventes.filter((x) => x.vendeur_id === v.id && x.mois === mois);
     const ouvertes = siennes.filter((x) => x.statut !== "Rejetée");
@@ -131,11 +137,13 @@ export function parVendeur(mois: string, vendeurs: Vendeur[], ventes: Vente[], o
     const avancesVersees = avances.reduce((a, x) => a + Number(x.montant), 0);
     const soldesVerses = vers.filter((x) => x.type === "Solde").reduce((a, x) => a + Number(x.montant), 0);
     const partValidee = part(valid);
+    const prev = previsionnel.find((p) => p.vendeur_id === v.id);
     const bonusRetention = ret.filter((r) => r.vendeurId === v.id).reduce((a, r) => a + r.bonusVendeur, 0);
     return {
       vendeur: v, declarees: ouvertes.length, validees: valid.length, rejetees: siennes.length - ouvertes.length,
-      partDeclaree: part(ouvertes), partValidee, vtm, vtb, transport, bonusRetention, reportees,
-      avanceCalculee: Math.round((part(ouvertes) * tauxAvance) / 100),
+      partDeclaree: prev ? Number(prev.part) : part(ouvertes), partValidee, vtm, vtb, transport, bonusRetention, reportees,
+      avanceCalculee: prev ? Number(prev.avance) : fige ? 0 : Math.round((part(ouvertes) * tauxAvance) / 100),
+      previsionnel: Boolean(prev),
       avancesVersees, soldesVerses,
       du: partValidee + vtm + vtb + transport + bonusRetention - avancesVersees - soldesVerses,
       avanceHorsFenetre: avances.some((x) => x.verse_le < fen.debut || x.verse_le > fen.fin),
