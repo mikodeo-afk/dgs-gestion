@@ -26,6 +26,7 @@ insert into factures_fournisseurs (fournisseur,numero,chantier_id,objet,montant_
 select pg_temp.check(true,'le RLA enregistre une facture fournisseur');
 select pg_temp.check(pg_temp.echoue($$select decider_facture_fournisseur((select id from factures_fournisseurs where numero='F-118'), true)$$), 'le RLA ne donne pas de bon à payer');
 select pg_temp.check(pg_temp.echoue($$select payer_facture_fournisseur((select id from factures_fournisseurs where numero='F-118'))$$), 'le RLA ne paie pas');
+select pg_temp.check(not pg_temp.echoue($$insert into depenses (objet,montant) values ('Fournitures de bureau',45000)$$), 'le RLA (administratif) impute une demande aux frais généraux');
 commit;
 
 begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';
