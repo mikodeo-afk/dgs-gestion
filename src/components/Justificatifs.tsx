@@ -2,20 +2,11 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseNavigateur } from "@/lib/supabase/navigateur";
+import { DOSSIER_SOCIETE, type TypesDossier } from "@/lib/dossiers";
 import { enregistrerJustificatif, lienJustificatif, type Objet } from "@/app/(app)/justificatifs-actions";
 
 export type Fichier = { id: string; nom_fichier: string; depose_le: string; type_document?: string | null; valide_jusquau?: string | null };
-export const DOCS_ADMIN = ["RCCM", "IFU / NIF", "Statuts", "Pièce d'identité du gérant", "Autre document administratif"];
-export const DOCS_FISCAUX = ["Attestation de régularité fiscale", "Quitus fiscal", "Attestation CNSS / INPS", "Autre document fiscal"];
 const TYPES = "application/pdf,image/jpeg,image/png,image/webp";
-/** Types de documents d'un dossier : groupes proposés, et types qui exigent une date de validité. */
-export type TypesDossier = { groupes: [string, string[]][]; avecValidite: string[] };
-const DOSSIER_SOCIETE: TypesDossier = { groupes: [["Administratif", DOCS_ADMIN], ["Fiscal", DOCS_FISCAUX]], avecValidite: DOCS_FISCAUX };
-export const DOSSIER_MATERIEL: TypesDossier = {
-  groupes: [["Avec date de validité", ["Assurance", "Visite technique", "Vignette / taxe", "Autorisation de transport"]],
-            ["Autres", ["Carte grise", "Facture d'achat", "Notice / garantie", "Photo", "Autre document"]]],
-  avecValidite: ["Assurance", "Visite technique", "Vignette / taxe", "Autorisation de transport"],
-};
 
 /** Documents signés d'une pièce : consultation et dépôt (PDF ou photo, 20 Mo au plus). */
 export default function Justificatifs({ objet, objetId, numero, pays, fichiers, peutDeposer, page, compact, dossier, types = DOSSIER_SOCIETE }: {

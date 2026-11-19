@@ -4,7 +4,8 @@ import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
 import { dateFr, fcfa, heureFr } from "@/lib/format";
 import { Kpi, Pastille } from "@/components/ui";
-import Justificatifs, { DOSSIER_MATERIEL } from "@/components/Justificatifs";
+import Justificatifs from "@/components/Justificatifs";
+import { DOSSIER_MATERIEL } from "@/lib/dossiers";
 import { FormAffectation, FormEntretien, FormFiche, FormPlein, type Equipement } from "../Formulaires";
 
 const ton = (e: string) => (e === "Bon" ? "ok" : e === "À réparer" ? "warn" : e === "En panne" ? "bad" : "info");
