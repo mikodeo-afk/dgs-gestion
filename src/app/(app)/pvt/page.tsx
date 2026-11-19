@@ -222,7 +222,7 @@ export default async function VentesTerrain({ searchParams }: { searchParams: Pr
             )}
             {gere && !m?.cloture && m?.extraction_recue_le && fac.ht > 0 && <ExtractionDefinitive mois={mois} libelle={`Enregistrer l'extraction définitive (${fcfa(fac.ht)} FCFA HT)`} />}
             {m?.cloture && <p className="note">Mois clôturé le {dateFr(m.definitive_le)} : les ventes ne changent plus (sauf le statut des lignes). Pour corriger, annulez le PV (et sa facture) dans PV d&apos;exécution : le mois se rouvre.</p>}
-            {gere && <FormMois mois={mois} m={m} cloture={Boolean(m?.cloture)} />}
+            {gere && <FormMois key={`${mois}|${m?.ajustement}|${m?.ajustement_motif}|${m?.extraction_recue_le}|${m?.note}|${m?.cloture}`} mois={mois} m={m} cloture={Boolean(m?.cloture)} />}
           </section>
 
           <section className="panel">
