@@ -5,7 +5,8 @@ import { supabaseServeur } from "@/lib/supabase/server";
 import { fcfa } from "@/lib/format";
 import { TYPES_TIERS, VOIT_TIERS, type LigneBordereau, type Tiers } from "@/lib/types";
 import { FormFiche, FormPrix, LignePrix } from "../Formulaires";
-import Justificatifs, { DOCS_ADMIN, DOCS_FISCAUX, type Fichier } from "@/components/Justificatifs";
+import Justificatifs, { type Fichier } from "@/components/Justificatifs";
+import { DOCS_ADMIN, DOCS_FISCAUX } from "@/lib/dossiers";
 import { Pastille } from "@/components/ui";
 import { aujourdhui, dateFr } from "@/lib/format";
 
