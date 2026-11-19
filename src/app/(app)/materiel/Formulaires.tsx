@@ -24,7 +24,7 @@ export function FormEquipement({ categorie, chantiers, personnel }: { categorie:
   return (
     <form className="inline" action={action}>
       <input type="hidden" name="categorie" value={categorie} />
-      <label>N° d&apos;inventaire<input name="code" required placeholder={roulant ? "ex. VH-001" : "ex. GE-001"} /></label>
+      <p className="note" style={{ gridColumn: "1/-1" }}>Le n° d&apos;inventaire est attribué automatiquement à l&apos;enregistrement ({roulant ? "VR-0001, VR-0002…" : "MT-0001, MT-0002…"}).</p>
       <label>Type<input name="type" required list="types-mat" /></label>
       <datalist id="types-mat">{(roulant ? TYPES_ROULANT : TYPES_TRAVAIL).map((t) => <option key={t}>{t}</option>)}</datalist>
       <label>Désignation<input name="designation" required placeholder={roulant ? "ex. Toyota Hilux double cabine" : "ex. Groupe 20 kVA"} /></label>

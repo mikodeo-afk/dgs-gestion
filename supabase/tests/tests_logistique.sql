@@ -83,6 +83,11 @@ insert into equipements (id, code, categorie, type, designation, immatriculation
   ('70000000-0000-0000-0000-000000000002', 'GE-001', 'Matériel de travail', 'Groupe électrogène', 'Groupe 20 kVA', null, 'h');
 select pg_temp.check(pg_temp.echoue($$insert into equipements (code, categorie, type, designation, immatriculation) values ('VH-002', 'Matériel roulant', 'Camion', 'Camion', 'ab1234md')$$),
                      'une immatriculation est unique');
+insert into equipements (code, categorie, type, designation, immatriculation) values
+  ('', 'Matériel roulant', 'Camion', 'Camion benne', 'CD 5678 MD'), ('', 'Matériel roulant', 'Moto', 'Moto', null),
+  ('', 'Matériel de travail', 'Soudeuse fibre', 'Soudeuse', null);
+select pg_temp.check((select array_agg(code order by code) from equipements where code ~ '^(VR|MT)-') = array['MT-0001','VR-0001','VR-0002'],
+                     'numéro d''inventaire automatique : VR-0001, VR-0002 (roulant), MT-0001 (travail)');
 select pg_temp.check(pg_temp.echoue($$update equipements set chantier_id = '10000000-0000-0000-0000-000000000001' where code = 'VH-001'$$),
                      'l''affectation passe par la fonction (historique)');
 select affecter_equipement('70000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000010', 'Bon', 12000, 'Chantier TEL-001');
