@@ -36,7 +36,7 @@ export default async function Depenses() {
         {aValider.length > 0 && <Pastille texte={`${aValider.length} à valider par vous`} ton="warn" />}
       </div>
       {s.peut("dep.demander") && (
-        <FormDepense chantiers={imputables} fraisGeneraux={s.peut("fg.saisir")} libelle={s.profil.poste === "compta" ? "Enregistrer la dépense" : "Envoyer la demande"} />
+        <FormDepense chantiers={imputables} fraisGeneraux={s.global || s.peut("fg.saisir")} libelle={s.profil.poste === "compta" ? "Enregistrer la dépense" : "Envoyer la demande"} />
       )}
       <p className="note">
         Chaque dépense est imputée à un chantier, sauf les frais généraux de fonctionnement. Jusqu&apos;à {fcfa(S)} FCFA, le RAF peut valider ; au-delà, seuls le PDG et le
