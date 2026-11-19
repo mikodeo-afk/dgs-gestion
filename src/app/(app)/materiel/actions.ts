@@ -14,13 +14,13 @@ export async function creerEquipement(_: Etat, f: FormData): Promise<Etat> {
   const supabase = await supabaseServeur();
   const roulant = txt(f, "categorie") === "Matériel roulant";
   const { data, error } = await supabase.from("equipements").insert({
-    code: txt(f, "code").toUpperCase(), categorie: txt(f, "categorie"), type: txt(f, "type"), designation: txt(f, "designation"),
+    code: "", categorie: txt(f, "categorie"), type: txt(f, "type"), designation: txt(f, "designation"),
     marque: txt(f, "marque") || null, modele: txt(f, "modele") || null, numero_serie: txt(f, "numero_serie") || null,
     immatriculation: roulant ? txt(f, "immatriculation").toUpperCase() || null : null,
     annee: num(f, "annee"), date_acquisition: txt(f, "date_acquisition") || null, valeur_acquisition: num(f, "valeur"),
     compteur: num(f, "compteur"), unite_compteur: txt(f, "unite_compteur") === "h" ? "h" : "km",
-  }).select("id").single();
-  if (error) return { erreur: error.code === "23505" ? "Ce numéro d'inventaire ou cette immatriculation existe déjà." : error.message };
+  }).select("id,code").single();
+  if (error) return { erreur: error.code === "23505" ? "Cette immatriculation existe déjà." : error.message };
   if (txt(f, "chantier_id") || txt(f, "responsable_id")) {
     const { error: e2 } = await supabase.rpc("affecter_equipement", {
       p_id: data.id, p_chantier: txt(f, "chantier_id") || null, p_responsable: txt(f, "responsable_id") || null,
@@ -28,7 +28,7 @@ export async function creerEquipement(_: Etat, f: FormData): Promise<Etat> {
     });
     if (e2) return { erreur: `Matériel enregistré, mais l'affectation a échoué : ${e2.message}` };
   }
-  await journaliser(`a enregistré le matériel ${txt(f, "code").toUpperCase()} « ${txt(f, "designation")} »`);
+  await journaliser(`a enregistré le matériel ${data.code} « ${txt(f, "designation")} »`);
   redirect(`/materiel/${data.id}`);
 }
 
