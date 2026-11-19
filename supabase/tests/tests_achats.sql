@@ -56,4 +56,21 @@ insert into droits_personne (profil_id, cle, accorde) values ('00000000-0000-000
 commit;
 select pg_temp.check(a_droit('bc.valider','00000000-0000-0000-0000-000000000006'), 'le DO peut accorder la validation des bons de commande');
 delete from droits_personne where cle = 'bc.valider';
+
+-- Frais généraux : le RLA demande un achat hors projet, le RAF le commande, la facture reste en frais généraux.
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000021';
+insert into demandes_achat (objet, montant_estime) values ('Ramettes de papier', 60000);
+select pg_temp.check((select chantier_id is null from demandes_achat where objet = 'Ramettes de papier'), 'le RLA impute une demande d''achat aux frais généraux');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';
+select initier_bon_commande((select id from demandes_achat where objet = 'Ramettes de papier'), 'Librairie', 50000);
+select pg_temp.check((select chantier_id is null from bons_commande where objet = 'Ramettes de papier'), 'le bon de commande reste en frais généraux');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000021';
+insert into demandes_achat (chantier_id, objet) values ('10000000-0000-0000-0000-000000000002', 'Imprimante');
+commit;
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000003';
+select initier_bon_commande((select id from demandes_achat where objet = 'Imprimante'), 'Librairie', 150000, 18, null, 'FG');
+select pg_temp.check((select chantier_id is null from bons_commande where objet = 'Imprimante'), 'le RAF impute le bon de commande aux frais généraux');
+commit;
 \echo 'Tous les tests des achats passent.'

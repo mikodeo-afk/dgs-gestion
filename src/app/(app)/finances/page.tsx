@@ -193,7 +193,7 @@ export default async function Finances({ searchParams }: { searchParams: Promise
     const fiscalOk = new Set((fisc ?? []).map((x) => x.objet_id));
     const docsFf = await documentsPar("facture_fournisseur");
     const { data: bcs } = await supabase.from("bons_commande").select("id,numero,chantier_id,fournisseur,objet").eq("statut", "Validé").order("numero");
-    const bonsValides: BcValide[] = (bcs ?? []).map((b) => ({ ...b, code: codes.get(b.chantier_id) ?? "" }));
+    const bonsValides: BcValide[] = (bcs ?? []).map((b) => ({ ...b, code: b.chantier_id ? codes.get(b.chantier_id) ?? "" : "Frais généraux" }));
     const nonRejetees = liste.filter((f) => f.statut !== "Rejetée" && f.statut !== "Annulée");
     const somme = (l: typeof liste, c: "montant_ht" | "montant_tva" | "montant_ttc") => l.reduce((a, f) => a + Number(f[c]), 0);
     const aPayer = liste.filter((f) => f.statut === "Reçue" || f.statut === "Validée").reduce((a, f) => a + Number(f.net_a_payer), 0);
