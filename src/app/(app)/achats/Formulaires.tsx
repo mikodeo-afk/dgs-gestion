@@ -9,11 +9,21 @@ function Retour({ etat }: { etat: Etat }) {
   return null;
 }
 
-export function FormDemandeAchat({ chantiers }: { chantiers: { id: string; code: string; nom: string }[] }) {
+export function FormDemandeAchat({ chantiers, fraisGeneraux }: { chantiers: { id: string; code: string; nom: string }[]; fraisGeneraux: boolean }) {
   const [etat, action, enCours] = useActionState(demanderAchat, null);
   return (
     <form className="inline" action={action}>
-      <label>Projet<select id="da-ch" name="chantier_id" required>{chantiers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.nom}</option>)}</select></label>
+      <label>Imputation
+        <select id="da-ch" name="chantier_id" required defaultValue="">
+          <option value="" disabled>— Choisir le projet ou les frais généraux —</option>
+          {fraisGeneraux && <option value="FG">Frais généraux (hors projet)</option>}
+          {chantiers.length > 0 && (
+            <optgroup label="Projets">
+              {chantiers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.nom}</option>)}
+            </optgroup>
+          )}
+        </select>
+      </label>
       <label>Besoin<input id="da-objet" name="objet" required placeholder="ex. Câble solaire 6 mm²" /></label>
       <label>Quantité, précisions<input id="da-det" name="details" placeholder="ex. 500 m, marque X" /></label>
       <label>Coût estimé (FCFA)<input id="da-est" name="montant_estime" type="number" min="1" /></label>
@@ -24,7 +34,7 @@ export function FormDemandeAchat({ chantiers }: { chantiers: { id: string; code:
   );
 }
 
-export function EtudeDemande({ id, numero }: { id: string; numero: string }) {
+export function EtudeDemande({ id, numero, imputation, chantiers }: { id: string; numero: string; imputation: string | null; chantiers: { id: string; code: string; nom: string }[] }) {
   const [etatBc, actionBc, enCoursBc] = useActionState(initierBonCommande, null);
   const [etatRej, actionRej, enCoursRej] = useActionState(rejeterDemande, null);
   return (
@@ -33,6 +43,12 @@ export function EtudeDemande({ id, numero }: { id: string; numero: string }) {
       <form className="inline" action={actionBc} style={{ marginTop: 8 }}>
         <input type="hidden" name="demande_id" value={id} /><input type="hidden" name="numero" value={numero} />
         <label>Fournisseur<input name="fournisseur" required /></label>
+        <label>Imputation
+          <select name="imputation" defaultValue={imputation ?? "FG"}>
+            <option value="FG">Frais généraux (hors projet)</option>
+            <optgroup label="Projets">{chantiers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.nom}</option>)}</optgroup>
+          </select>
+        </label>
         <label>Montant HT (FCFA)<input name="montant_ht" type="number" min="1" required /></label>
         <label>TVA<select name="taux_tva" defaultValue="18"><option value="18">Taux du pays</option><option value="0">Exonérée (0 %)</option></select></label>
         <label>Livraison prévue<input name="livraison_le" type="date" /></label>

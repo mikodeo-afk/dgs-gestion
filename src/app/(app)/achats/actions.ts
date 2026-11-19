@@ -14,7 +14,7 @@ export async function demanderAchat(_: Etat, f: FormData): Promise<Etat> {
   const supabase = await supabaseServeur();
   const estime = Number(txt(f, "montant_estime"));
   const { data, error } = await supabase.from("demandes_achat").insert({
-    chantier_id: txt(f, "chantier_id"), objet: txt(f, "objet"), details: txt(f, "details") || null,
+    chantier_id: txt(f, "chantier_id") === "FG" ? null : txt(f, "chantier_id"), objet: txt(f, "objet"), details: txt(f, "details") || null,
     montant_estime: estime > 0 ? estime : null, besoin_le: txt(f, "besoin_le") || null,
   }).select("numero").single();
   if (error) return { erreur: "La demande n'a pas été enregistrée : " + error.message };
@@ -30,6 +30,7 @@ export async function initierBonCommande(_: Etat, f: FormData): Promise<Etat> {
   const { data, error } = await supabase.rpc("initier_bon_commande", {
     p_demande: txt(f, "demande_id"), p_fournisseur: txt(f, "fournisseur"), p_montant_ht: ht,
     p_taux_tva: txt(f, "taux_tva") === "0" ? 0 : (await tauxDuPays()).tva, p_livraison: txt(f, "livraison_le") || null,
+    p_imputation: txt(f, "imputation") || null,
   });
   if (error) return { erreur: error.message };
   await journaliser(`a initié le bon de commande ${data} (${fcfa(ht)} FCFA HT) pour la demande ${txt(f, "numero")}`);

@@ -40,23 +40,23 @@ export default async function Achats() {
         {s.peut("bc.initier") && aEtudier > 0 && <Pastille texte={`${aEtudier} demande(s) à étudier`} ton="warn" />}
         {s.peut("bc.valider") && aValider > 0 && <Pastille texte={`${aValider} bon(s) à valider`} ton="warn" />}
       </div>
-      {s.peut("da.demander") && <FormDemandeAchat chantiers={projets} />}
+      {s.peut("da.demander") && <FormDemandeAchat chantiers={projets} fraisGeneraux={s.global || s.peut("fg.saisir")} />}
 
       <section className="panel">
         <h2>Demandes d&apos;achat</h2>
         <div className="tbl">
           <table>
-            <thead><tr><th>Demande</th><th>Projet</th><th>Initiée par</th><th className="num">Coût estimé</th><th className="num">Nécessaire le</th><th>Statut</th><th>Action</th></tr></thead>
+            <thead><tr><th>Demande</th><th>Imputation</th><th>Initiée par</th><th className="num">Coût estimé</th><th className="num">Nécessaire le</th><th>Statut</th><th>Action</th></tr></thead>
             <tbody>
               {da.map((d) => (
                 <tr key={d.id}>
                   <td><span className="code">{d.numero}</span><br />{d.objet}{d.details && <><br /><span className="note">{d.details}</span></>}</td>
-                  <td className="code">{codes.get(d.chantier_id)}</td>
+                  <td>{d.chantier_id ? <span className="code">{codes.get(d.chantier_id)}</span> : <span className="dom">Frais généraux</span>}</td>
                   <td>{noms.get(d.demandeur_id)}<br /><span className="note">{dateFr(d.cree_le.slice(0, 10))}</span></td>
                   <td className="num">{d.montant_estime ? fcfa(d.montant_estime) : "—"}</td>
                   <td className="num">{d.besoin_le ? dateFr(d.besoin_le) : "—"}</td>
                   <td><Pastille texte={d.statut === "Soumise" ? "À étudier (RAF)" : d.statut} ton={TON[d.statut]} />{d.motif_rejet && <><br /><span className="note">{d.motif_rejet}</span></>}</td>
-                  <td>{d.statut === "Soumise" && s.peut("bc.initier") && <EtudeDemande id={d.id} numero={d.numero} />}</td>
+                  <td>{d.statut === "Soumise" && s.peut("bc.initier") && <EtudeDemande id={d.id} numero={d.numero} imputation={d.chantier_id} chantiers={chantiers ?? []} />}</td>
                 </tr>
               ))}
               {!da.length && <tr><td colSpan={7} className="note">Aucune demande d&apos;achat.</td></tr>}
@@ -71,12 +71,12 @@ export default async function Achats() {
         <h2>Bons de commande</h2>
         <div className="tbl">
           <table>
-            <thead><tr><th>Bon</th><th>Projet</th><th>Fournisseur</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Initié par</th><th>Statut</th><th>Bon signé</th><th>Action</th></tr></thead>
+            <thead><tr><th>Bon</th><th>Imputation</th><th>Fournisseur</th><th className="num">Montant HT</th><th className="num">TVA</th><th className="num">Montant TTC</th><th>Initié par</th><th>Statut</th><th>Bon signé</th><th>Action</th></tr></thead>
             <tbody>
               {bc.map((b) => (
                 <tr key={b.id}>
                   <td><span className="code">{b.numero}</span><br />{b.objet}{b.livraison_le && <><br /><span className="note">Livraison {dateFr(b.livraison_le)}</span></>}</td>
-                  <td className="code">{codes.get(b.chantier_id)}</td>
+                  <td>{b.chantier_id ? <span className="code">{codes.get(b.chantier_id)}</span> : <span className="dom">Frais généraux</span>}</td>
                   <td>{b.fournisseur}</td>
                   <td className="num">{fcfa(b.montant_ht)}</td>
                   <td className="num">{fcfa(b.montant_tva)}<br /><span className="note">{Number(b.taux_tva) ? `${Number(b.taux_tva)} %` : "Exonéré"}</span></td>
