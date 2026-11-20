@@ -5,7 +5,7 @@ export default function FondPhotos({ variante }: { variante: "connexion" | "app"
   if (variante === "connexion")
     return (
       <div className="fond fond-connexion" aria-hidden="true">
-        <div className="siege" style={{ backgroundImage: "url(/fonds/siege.webp)" }} />
+        <div className="siege" style={{ backgroundImage: "url(/fonds/siege-clair.webp)" }} />
       </div>
     );
   return (
