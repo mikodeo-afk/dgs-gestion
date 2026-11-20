@@ -255,7 +255,7 @@ select.a-renseigner{border-color:var(--warn,#b7791f);background:#fff8e6}
 .fond{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;background:var(--ink)}
 .fond>div{position:absolute;inset:-4%;background-size:cover;background-position:center;opacity:0;animation:fond-defile 35s linear infinite}
 .fond::after{content:"";position:absolute;inset:0}
-.fond-connexion::after{background:linear-gradient(180deg,rgba(1,1,76,.15),rgba(1,1,76,.45) 45%,rgba(1,1,76,.8))}
+.fond-connexion::after{background:linear-gradient(180deg,rgba(1,1,76,0),rgba(1,1,76,.2) 45%,rgba(1,1,76,.7))}
 .fond>.siege{opacity:1;background-position:center 22%;animation:fond-siege 30s ease-in-out infinite alternate}
 @keyframes fond-siege{from{transform:scale(1)}to{transform:scale(1.1)}}
 @media (prefers-reduced-motion:reduce){.fond>.siege{animation:none}}
@@ -271,5 +271,5 @@ select.a-renseigner{border-color:var(--warn,#b7791f);background:#fff8e6}
 @media (prefers-reduced-motion:reduce){.login form{animation:none}}
 @media print{.fond{display:none!important}}
 .login>div:not(.fond){width:min(380px,100%)}
-@media (min-width:861px){.login{justify-items:end;padding-right:8vw}.fond>.siege{background-position:30% 22%}}
+@media (min-width:861px){.login{justify-items:end;align-items:end;padding-right:8vw;padding-bottom:7vh}.fond>.siege{background-position:30% 22%}}
 @media (max-width:860px){.login{align-items:end;padding-bottom:max(28px,env(safe-area-inset-bottom,0px))}}
