@@ -251,3 +251,20 @@ table.etat tr.tot td{font-weight:700;background:var(--surface2)}
 
 /* Ventes terrain : statut de ligne à renseigner */
 select.a-renseigner{border-color:var(--warn,#b7791f);background:#fff8e6}
+/* Fond animé en photos (connexion et pages de l'application) */
+.fond{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;background:var(--ink)}
+.fond>div{position:absolute;inset:-4%;background-size:cover;background-position:center;opacity:0;animation:fond-defile 35s linear infinite}
+.fond::after{content:"";position:absolute;inset:0}
+.fond-connexion::after{background:linear-gradient(160deg,rgba(1,1,76,.55),rgba(1,1,76,.82))}
+.fond-app{background:var(--bg)}
+.fond-app>div{filter:grayscale(.3)}
+.fond-app::after{background:var(--bg);opacity:.9}
+@keyframes fond-defile{0%{opacity:0;transform:scale(1)}4%{opacity:1}20%{opacity:1}26%{opacity:0;transform:scale(1.08)}100%{opacity:0;transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.fond>div{animation:none}.fond>div:first-child{opacity:1}}
+.login{position:relative}
+.login form{box-shadow:0 18px 50px rgba(0,0,0,.35);animation:login-entre .6s ease-out both}
+.login .accroche{color:#fff;text-align:center;font-family:var(--f-display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;margin-top:14px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+@keyframes login-entre{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.login form{animation:none}}
+@media print{.fond{display:none!important}}
+.login>div:not(.fond){width:min(380px,100%)}
