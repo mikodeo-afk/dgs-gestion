@@ -2,6 +2,7 @@ import { exigerSession } from "@/lib/session";
 import { POSTES, VOIT_TIERS } from "@/lib/types";
 import Nav from "./Nav";
 import Installer from "@/components/Installer";
+import FondPhotos from "@/components/FondPhotos";
 import { changerPays } from "./pays-actions";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
+      <FondPhotos variante="app" />
       <header className="top">
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
