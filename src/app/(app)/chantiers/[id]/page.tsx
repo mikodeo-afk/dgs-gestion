@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { exigerSession } from "@/lib/session";
 import { supabaseServeur } from "@/lib/supabase/server";
-import { aujourdhui, dateFr, fcfa } from "@/lib/format";
+import { aujourdhui, dateFr, fcfa, heureFr } from "@/lib/format";
 import type { Chantier, Tache } from "@/lib/types";
 import { Barre, Kpi, Pastille, etatTache } from "@/components/ui";
 import { modifierChantier, supprimerLigneChantier } from "../actions";
@@ -17,12 +17,15 @@ export default async function FicheChantier({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const s = await exigerSession();
   const supabase = await supabaseServeur();
-  const [{ data: c }, { data: taches }, { data: fin }, { data: profils }, { data: av }] = await Promise.all([
+  const depuis = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const [{ data: c }, { data: taches }, { data: fin }, { data: profils }, { data: av }, { data: pointages }] = await Promise.all([
     supabase.from("chantiers").select("*").eq("id", id).maybeSingle(),
     supabase.from("taches").select("*").eq("chantier_id", id).order("echeance", { nullsFirst: false }),
     supabase.from("chantiers_finance").select("*").eq("chantier_id", id).maybeSingle(),
     supabase.from("profils").select("id,nom,poste,responsable_id").eq("actif", true).order("nom"),
     supabase.rpc("avancement_chantiers"),
+    supabase.from("presences").select("profil_id,jour,heure_arrivee,distance_m,controle,motif_rejet").eq("chantier_id", id)
+      .gte("jour", depuis).not("heure_arrivee", "is", null).order("jour", { ascending: false }).order("heure_arrivee"),
   ]);
   if (!c) notFound();
   const ch = c as Chantier & { client_id: string | null; validation: string; ouverture: string | null; cree_par: string | null; valide_par: string | null; valide_le: string | null; pays: string };
@@ -181,6 +184,28 @@ export default async function FicheChantier({ params }: { params: Promise<{ id: 
           </table>
         </div>
       </section>
+      {(pointages ?? []).length > 0 && (
+        <section className="panel">
+          <h2>Pointages sur ce chantier (7 derniers jours)</h2>
+          <p className="note">Arrivées pointées sur place (GPS et selfie), quelle que soit l&apos;équipe. Les RH contrôlent les selfies.</p>
+          <div className="tbl">
+            <table>
+              <thead><tr><th>Jour</th><th>Agent</th><th className="num">Arrivée</th><th className="num">Distance</th><th>Contrôle RH</th></tr></thead>
+              <tbody>
+                {(pointages ?? []).map((p) => (
+                  <tr key={`${p.profil_id}-${p.jour}`}>
+                    <td>{dateFr(p.jour)}</td>
+                    <td>{noms.get(p.profil_id) ?? "—"}</td>
+                    <td className="num">{heureFr(p.heure_arrivee)}</td>
+                    <td className="num">{p.distance_m != null ? `${p.distance_m} m` : "—"}</td>
+                    <td><Pastille texte={p.controle ?? "À contrôler"} ton={p.controle === "Conforme" ? "ok" : p.controle === "Rejeté" ? "bad" : "warn"} />{p.motif_rejet && <span className="note"> {p.motif_rejet}</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       {materielUtilise.length > 0 && (
         <section className="panel">
           <h2>Matériel utilisé</h2>

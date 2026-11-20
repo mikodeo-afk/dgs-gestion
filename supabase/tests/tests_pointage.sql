@@ -106,3 +106,11 @@ select pg_temp.check(pg_temp.echoue($$select definir_photo_reference('00000000-0
 commit;
 select pg_temp.check((select photo_reference like 'BJ/reference/%' from profils where id = '00000000-0000-0000-0000-000000000001'),
                      'photo de référence d''une personne à accès groupe enregistrée depuis le Bénin');
+
+-- Le chef de projet voit les pointages faits sur son chantier, même par un agent qui ne lui est pas rattaché.
+update profils set responsable_id = null where id = '00000000-0000-0000-0000-000000000010';
+begin; set local role authenticated; set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000006';
+select pg_temp.check((select count(*) from presences where profil_id = '00000000-0000-0000-0000-000000000010' and chantier_id = '10000000-0000-0000-0000-000000000001') > 0,
+                     'le chef de projet voit le pointage d''un agent hors de son équipe sur son chantier');
+commit;
+update profils set responsable_id = '00000000-0000-0000-0000-000000000008' where id = '00000000-0000-0000-0000-000000000010';
