@@ -273,3 +273,19 @@ select.a-renseigner{border-color:var(--warn,#b7791f);background:#fff8e6}
 .login>div:not(.fond){width:min(380px,100%)}
 @media (min-width:861px){.login{justify-items:end;align-items:end;padding-right:8vw;padding-bottom:7vh}.fond>.siege{background-position:30% 22%}}
 @media (max-width:860px){.login{align-items:end;padding-bottom:max(28px,env(safe-area-inset-bottom,0px))}}
+
+/* Notifications : cloche de l'en-tête et liste */
+.cloche{position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;color:#fff;background:#ffffff1a;border:1px solid #ffffff40;text-decoration:none}
+.cloche:hover{background:#ffffff2e}
+.cloche b{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--gold,#e5b204);color:#01014c;font:700 11px/19px var(--f-mono,monospace);text-align:center}
+.notif-appareil{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.notif-appareil>div{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 260px}
+.notif-appareil span{color:var(--muted)}
+.notifs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.notifs li+li{border-top:1px solid var(--line)}
+.notifs a{display:flex;flex-direction:column;gap:2px;padding:10px 6px;color:inherit;text-decoration:none;border-radius:6px}
+.notifs a:hover{background:var(--surface2)}
+.notifs .t{font-weight:600}
+.notifs .m{color:var(--muted)}
+.notifs .q{font-size:12px;color:var(--muted)}
+.notifs li.nouvelle .t::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold,#e5b204);margin-right:8px;vertical-align:middle}

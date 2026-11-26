@@ -18,7 +18,8 @@ export async function rafraichirSession(request: NextRequest) {
     },
   );
   const { data } = await supabase.auth.getUser();
-  const publique = request.nextUrl.pathname.startsWith("/connexion");
+  // /api/push est appelé par la base de données (vérifié par un secret partagé), sans session.
+  const publique = request.nextUrl.pathname.startsWith("/connexion") || request.nextUrl.pathname === "/api/push";
   if (!data.user && !publique) {
     const url = request.nextUrl.clone();
     url.pathname = "/connexion";

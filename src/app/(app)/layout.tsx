@@ -3,12 +3,16 @@ import { POSTES, VOIT_TIERS } from "@/lib/types";
 import Nav from "./Nav";
 import Installer from "@/components/Installer";
 import FondPhotos from "@/components/FondPhotos";
+import Cloche from "@/components/Cloche";
 import { changerPays } from "./pays-actions";
+import { supabaseServeur } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const s = await exigerSession();
+  const { data: nonLues } = await (await supabaseServeur()).rpc("notifications_non_lues");
+  const compteur = Number(nonLues ?? 0);
   const terrain = s.profil.poste === "tech";
   const vendeur = s.profil.poste === "vendeur";
   const liens = vendeur ? [
@@ -62,6 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <button className="btn sm" type="submit">Changer de pays</button>
             </form>
           )}
+          <Cloche initial={compteur} />
           <span className="moi">
             {s.profil.nom} · {POSTES[s.profil.poste].court}
           </span>
