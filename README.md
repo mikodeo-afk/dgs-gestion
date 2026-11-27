@@ -25,6 +25,8 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 - Agent comptable (Bénin) : chaque mois, les déclarations à faire (TVA, ITS et redevance ORTB, VPS, AIB retenu, retenue sur loyers, CNSS, acomptes et solde d'IS, états financiers, patente) calculées à partir des factures, dépenses, frais généraux et salariés déclarés, avec leur échéance, le détail du calcul, les alertes (retards, salariés non déclarés, paie non validée) et le registre des déclarations faites. Un assistant IA (clé `ANTHROPIC_API_KEY`) explique les calculs et ce qu'il faut préparer. Les règles sont dans `src/lib/fiscal/regles.ts` ; un autre pays s'ajoute au même endroit.
 - États financiers annuels (SYSCOHADA révisé, système normal) : bilan, compte de résultat et tableau des flux de trésorerie calculés à partir des données de l'application et des données de clôture saisies (capital, trésorerie au 31/12, emprunts…), contrôles (équilibre du bilan, cohérence de la trésorerie, salariés non déclarés, matériel sans valeur), notes annexes rédigées par l'agent IA, arrêté des comptes et version imprimable.
 
+- Notifications : dès qu'une opération attend une validation (dépense, facture fournisseur, demande d'achat, bon de commande, proforma, paie, ouverture de chantier), chaque personne qui a le droit de la valider dans le pays de l'opération (ou avec l'accès groupe) est prévenue : cloche avec compteur dans l'en-tête, page Notifications, et notification sur le téléphone ou l'ordinateur si elle l'active (page Notifications > Activer ; sur iPhone, depuis l'application ajoutée à l'écran d'accueil). Quand l'opération est traitée, elle sort du compteur de tous les valideurs et l'auteur est prévenu de la décision. Les clés d'envoi sont créées automatiquement à la première activation (extension `pg_net` de Supabase) ; la variable `URL_APPLICATION` (facultative) fixe l'adresse du site appelée par la base.
+
 À venir : l'application mobile (pointage par reconnaissance faciale dans le rayon du chantier, géolocalisation), l'impôt sur salaire (ITS) et les pièces jointes (photos de justificatifs).
 
 ## Plusieurs pays
@@ -33,7 +35,7 @@ Chaque employé a son propre compte. Les droits sont vérifiés **dans la base d
 
 ## Mise en service
 
-1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0034`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré, `0009` que `0008` le soit, et `0024` que `0023` le soit).
+1. **Supabase** : créer un projet (région la plus proche : Europe de l'Ouest). Dans *SQL Editor*, exécuter, dans l'ordre, le contenu de chaque fichier de `supabase/migrations/` (`0001` à `0035`, chaque fichier séparément et dans l'ordre : `0005` a besoin que `0004` soit déjà enregistré, `0009` que `0008` le soit, et `0024` que `0023` le soit).
    Pour la lecture des photos (bordereaux, factures, tableaux de dossiers) : ajouter `ANTHROPIC_API_KEY` dans les variables d'environnement de Vercel.
 2. **Vercel** : importer ce dépôt GitHub, puis renseigner les variables d'environnement (voir `.env.example`) :
    - `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API) ;
